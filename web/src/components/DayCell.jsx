@@ -5,8 +5,8 @@ import { sanitizeHtml } from '../../../shared/sanitize.js';
 
 const REMINDER_LABEL = (min) => (min === 0 ? '정시' : min < 60 ? `${min}분 전` : min < 1440 ? `${min / 60}시간 전` : `${min / 1440}일 전`);
 
-function ItemRow({ item, index, s, onToggle, onDragStart }) {
-  const marker = s.listStyle === 'number' ? `${index + 1}.` : s.listStyle === 'bullet' ? '•' : '';
+function ItemRow({ item, index, s, listStyle, onToggle, onDragStart }) {
+  const marker = listStyle === 'number' ? `${index + 1}.` : listStyle === 'bullet' ? '•' : '';
   const textBg = s.textBackground === 'light' ? 'rgba(255,255,255,.22)' : s.textBackground === 'dark' ? 'rgba(0,0,0,.25)' : '';
   return (
     <li
@@ -38,7 +38,7 @@ function ItemRow({ item, index, s, onToggle, onDragStart }) {
 }
 
 function DayCellImpl({
-  date, today, s, items, info, inMonth, isRest, editing, highlight, monthLabel, weekNo, dayBg,
+  date, today, s, items, info, inMonth, restKind, editing, highlight, monthLabel, weekNo, dayBg, dayList,
   onOpenEditor, onToggle, onDropItem, compact,
 }) {
   const [dragOver, setDragOver] = useState(false);
@@ -48,7 +48,7 @@ function DayCellImpl({
 
   const classes = ['cell'];
   if (isToday) classes.push('today');
-  if (isRest) classes.push('rest');
+  if (restKind) classes.push('rest', `rest-${restKind}`);
   if (dayBg) classes.push('colored');
   if (!inMonth) classes.push('other-month');
   if (dragOver) classes.push('drag-over');
@@ -81,9 +81,9 @@ function DayCellImpl({
       <div className="cell-head">
         {!monthLabel && <span className="day-num">{day}</span>}
         {info.holidays.map((h) => (
-          <span key={h.name} className={`hol ${h.type}`} style={{ color: h.type === 'holiday' ? s.holidayTextColor : undefined }}>{h.name}</span>
+          <span key={h.name} className={`hol ${h.type}`}>{h.name}</span>
         ))}
-        {info.solarTerm && <span className="term" style={{ color: s.solarTermColor }}>{info.solarTerm}</span>}
+        {info.solarTerm && <span className="term">{info.solarTerm}</span>}
         <span className="spacer" />
         {weekNo != null && <span className="week-no">{weekNo}주</span>}
         {info.lunar && <span className="lunar">{info.lunar}</span>}
@@ -91,7 +91,7 @@ function DayCellImpl({
       {!s.hideTasks && (
         <ul className="items">
           {(compact ? visible.slice(0, 3) : visible).map((item, i) => (
-            <ItemRow key={item.key} item={item} index={i} s={s} onToggle={onToggle}
+            <ItemRow key={item.key} item={item} index={i} s={s} listStyle={dayList || s.listStyle} onToggle={onToggle}
               onDragStart={(e, it) => {
                 e.dataTransfer.setData('text/event-id', it._id);
                 e.dataTransfer.setData('text/from-date', it.day);

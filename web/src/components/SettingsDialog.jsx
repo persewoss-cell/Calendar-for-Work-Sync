@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ColorInput, range, Row, Section, Select, Toggle } from './Modal.jsx';
 import { Icon } from './Icon.jsx';
-import { DEFAULT_SETTINGS, FONTS } from '../lib/settings.js';
+import { DEFAULT_SETTINGS } from '../lib/settings.js';
+import { ensureFontPreviews, fontCss, FONTS } from '../lib/fonts.js';
+import { api } from '../lib/api.js';
 import { HOLIDAY_REGIONS } from '../lib/holidays.js';
 import { playSound, SOUNDS } from '../lib/sound.js';
 import { isDesktop } from '../lib/desktop.js';
@@ -20,7 +22,6 @@ const TABS = [
 
 const percent = (from, to, step) => Array.from({ length: (to - from) / step + 1 }, (_, i) => ({ value: from + i * step, label: `${from + i * step}%` }));
 const soundOptions = Object.entries(SOUNDS).map(([value, s]) => ({ value, label: s.label }));
-const fontOptions = FONTS.map((f) => ({ value: f.value, label: f.label }));
 
 function StyleCard({ selected, label, onClick, children }) {
   return (
@@ -81,16 +82,109 @@ function ShortcutRow({ label, value, onChange }) {
   );
 }
 
+/** Font picker grouped by kind, with a live sample. */
+function FontSelect({ value, onChange }) {
+  const groups = [...new Set(FONTS.map((f) => f.group))];
+  return (
+    <span className="font-select">
+      <select className="select" value={value} onChange={(e) => onChange(e.target.value)} onFocus={ensureFontPreviews}>
+        {groups.map((g) => (
+          <optgroup key={g} label={g}>
+            {FONTS.filter((f) => f.group === g).map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+          </optgroup>
+        ))}
+      </select>
+      <span className="font-sample" style={{ fontFamily: fontCss(value) }}>가나다 123</span>
+    </span>
+  );
+}
+
+const sizeOptions = (from, to) => range(from, to, (n) => `${n}px`);
+
+const CAL_TEXT = [
+  ['title', '상단 제목 (오늘은 …)', 10, 36],
+  ['weekday', '요일', 9, 30],
+  ['day', '날짜 숫자', 9, 40],
+  ['month', '월 표시 (11월)', 9, 30],
+  ['holiday', '휴일·기념일 이름', 8, 24],
+  ['term', '24절기', 8, 24],
+  ['lunar', '음력', 8, 20],
+];
+
+/** One row of the calendar text table: size · color · bold. */
+function TextStyleRow({ label, value, min, max, onChange, hint }) {
+  return (
+    <Row label={label} hint={hint}>
+      <Select value={value.size} onChange={(size) => onChange({ ...value, size })} options={sizeOptions(min, max)} />
+      <ColorInput value={value.color} onChange={(color) => onChange({ ...value, color })} />
+      <button type="button" className={`bold-toggle ${value.bold ? 'on' : ''}`} title="굵게" aria-pressed={value.bold}
+        onClick={() => onChange({ ...value, bold: !value.bold })}>B</button>
+    </Row>
+  );
+}
+
+const ITEM_PROP = { editFontFamily: ['font-family', '글꼴'], editFontSize: ['font-size', '크기'], editTextColor: ['color', '색'] };
+
 export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', onOpenHelp }) {
   const [tab, setTab] = useState(initialTab);
   const set = (k) => (v) => update({ [k]: v });
+  const setText = (k) => (v) => update({ calText: { ...s.calText, [k]: v } });
+
+  // 편집 내용 공통 글꼴: after a change, ask whether items formatted by hand should follow it too.
+  const [ask, setAsk] = useState(null); // { props: [...], counts }
+  const pendingProps = useRef(new Set());
+  const askTimer = useRef(null);
+  const setItemStyle = (k) => (v) => {
+    update({ [k]: v });
+    pendingProps.current.add(ITEM_PROP[k][0]);
+    clearTimeout(askTimer.current);
+    askTimer.current = setTimeout(async () => {
+      const props = [...pendingProps.current];
+      pendingProps.current.clear();
+      try {
+        const usage = await api.styleUsage();
+        const hit = props.filter((p) => usage[p] > 0);
+        if (hit.length) setAsk({ props: hit, count: Math.max(...hit.map((p) => usage[p])) });
+      } catch { /* offline: nothing to ask */ }
+    }, 900);
+  };
+  const answer = async (applyAll) => {
+    const { props } = ask;
+    setAsk(null);
+    if (applyAll) await api.stripStyle(props).catch(() => {});
+  };
+  useEffect(() => () => clearTimeout(askTimer.current), []);
+
+  // Drag the window by its title bar; remember where it was.
+  const [pos, setPos] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('settingsPos')) || null; } catch { return null; }
+  });
+  const drag = useRef(null);
+  const onTitleDown = (e) => {
+    if (e.target.closest('button')) return;
+    const rect = e.currentTarget.parentElement.getBoundingClientRect();
+    drag.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onTitleMove = (e) => {
+    if (!drag.current) return;
+    const x = Math.min(Math.max(e.clientX - drag.current.dx, -600), window.innerWidth - 120);
+    const y = Math.min(Math.max(e.clientY - drag.current.dy, 0), window.innerHeight - 40);
+    setPos({ x, y });
+  };
+  const onTitleUp = () => {
+    if (!drag.current) return;
+    drag.current = null;
+    try { localStorage.setItem('settingsPos', JSON.stringify(pos)); } catch { /* ignore */ }
+  };
   const setShortcut = (k) => (v) => update({ shortcuts: { ...s.shortcuts, [k]: v } });
   const current = TABS.find((t) => t.id === tab);
 
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="settings-window" role="dialog" aria-label="설정">
-        <div className="settings-titlebar">
+    <div className="settings-layer">
+      <div className="settings-window" role="dialog" aria-label="설정"
+        style={pos ? { position: 'absolute', left: pos.x, top: pos.y } : undefined}>
+        <div className="settings-titlebar" onPointerDown={onTitleDown} onPointerMove={onTitleMove} onPointerUp={onTitleUp} title="끌어서 옮길 수 있습니다">
           <span className="app-mark" />캘린더 목록 - 설정
           <button className="icon-btn dark" onClick={onClose} aria-label="닫기"><Icon name="x" /></button>
         </div>
@@ -117,9 +211,15 @@ export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', on
                     <StyleCard selected={s.viewStyle === 'week'} label="고정 단일 행" onClick={() => set('viewStyle')('week')}><Blocks rows={1} cols={5} /></StyleCard>
                     <StyleCard selected={s.viewStyle === 'strip'} label="변동 단일 행" onClick={() => set('viewStyle')('strip')}><Blocks rows={1} cols={5} hl={[0, 4]} /></StyleCard>
                   </div>
-                  <Row label="최대 행"><Select value={s.maxRows} onChange={set('maxRows')} options={range(1, 8)} /></Row>
-                  <Row label="지나간 주 표시"><Select value={s.pastWeeks} onChange={set('pastWeeks')} options={range(0, 4)} /></Row>
-                  <Row label="최대 열 수"><Select value={s.maxColumns} onChange={set('maxColumns')} options={range(3, 14)} /></Row>
+                  <Row label="최대 행" hint={s.viewStyle === 'rolling' ? '' : s.viewStyle === 'month' ? '전체 월: 그 달이 다 보이는 줄 수보다 크게 하면 아래에 줄이 더 붙습니다.' : '변동 월·전체 월에서 쓰입니다.'}>
+                    <Select value={s.maxRows} onChange={set('maxRows')} options={range(1, 8)} />
+                  </Row>
+                  <Row label="지나간 주 표시" hint={s.viewStyle === 'rolling' ? '이번 주 위에 지난주를 몇 줄 보여줄지' : '변동 월에서만 쓰입니다.'}>
+                    <Select value={s.pastWeeks} onChange={set('pastWeeks')} options={range(0, 4)} />
+                  </Row>
+                  <Row label="최대 열 수" hint={s.viewStyle === 'strip' ? '' : '변동 단일 행에서만 쓰입니다.'}>
+                    <Select value={s.maxColumns} onChange={set('maxColumns')} options={range(3, 14)} />
+                  </Row>
                 </Section>
                 <Section title="디스플레이 효과">
                   <Row label="유리 효과"><Toggle checked={s.glass} onChange={set('glass')} /></Row>
@@ -159,7 +259,7 @@ export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', on
                 </Section>
                 <Section title="함수">
                   <Row label="체크박스 표시"><Toggle checked={s.showCheckbox} onChange={set('showCheckbox')} /></Row>
-                  <Row label="완료 작업 자동으로 맨 아래 줄로 이동"><Toggle checked={s.doneToBottom} onChange={set('doneToBottom')} /></Row>
+                  <Row label="완료 작업 자동으로 맨 아래 줄로 이동" hint="한 칸에 일정이 여러 개일 때 완료한 일이 아래로 내려갑니다."><Toggle checked={s.doneToBottom} onChange={set('doneToBottom')} /></Row>
                   <Row label="완료된 작업 표시"><Toggle checked={s.showDone} onChange={set('showDone')} /></Row>
                   <Row label="완료 아이콘 표시"><Toggle checked={s.showDoneIcon} onChange={set('showDoneIcon')} /></Row>
                   <Row label="알림 시간 표시"><Toggle checked={s.showReminderTime} onChange={set('showReminderTime')} /></Row>
@@ -181,25 +281,35 @@ export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', on
 
             {tab === 'font' && (
               <>
-                <Section title="글꼴 색상 및 텍스트 크기">
-                  <Row label="캘린더 글꼴">
-                    <Select value={s.fontFamily} onChange={set('fontFamily')} options={fontOptions} />
-                    <Select value={s.fontSize} onChange={set('fontSize')} options={range(10, 22, (n) => `${n}px`)} />
-                    <ColorInput value={s.textColor} onChange={set('textColor')} />
-                  </Row>
-                  <Row label="편집 내용의 글꼴 크기 및 색상">
-                    <Select value={s.editFontFamily} onChange={set('editFontFamily')} options={fontOptions} />
-                    <Select value={s.editFontSize} onChange={set('editFontSize')} options={range(10, 22, (n) => `${n}px`)} />
-                    <ColorInput value={s.editTextColor} onChange={set('editTextColor')} />
-                  </Row>
+                <Section title="캘린더 글꼴 (달력의 제목·요일·날짜)">
+                  <Row label="공통 글꼴"><FontSelect value={s.fontFamily} onChange={set('fontFamily')} /></Row>
+                  <div className="text-table-head"><span>항목</span><span>크기 · 색 · 굵게</span></div>
+                  {CAL_TEXT.map(([k, label, min, max]) => (
+                    <TextStyleRow key={k} label={label} value={s.calText[k]} min={min} max={max} onChange={setText(k)}
+                      hint={k === 'lunar' && !s.showLunar ? '캘린더 탭에서 「음력」을 켜야 보입니다.' : k === 'term' && !s.showSolarTerms ? '캘린더 탭에서 「24절기」를 켜야 보입니다.' : k === 'holiday' && !s.showHolidays ? '캘린더 탭에서 「공휴일」을 켜야 보입니다.' : ''} />
+                  ))}
+                </Section>
+                <Section title="편집 내용 공통 글꼴 및 크기">
+                  <p className="set-note">달력 칸에 적은 일정 글자의 기본 모양입니다. 입력창에서 직접 바꾼 글자는 따로 물어본 뒤에 바꿉니다.</p>
+                  <Row label="글꼴"><FontSelect value={s.editFontFamily} onChange={setItemStyle('editFontFamily')} /></Row>
+                  <Row label="크기"><Select value={s.editFontSize} onChange={setItemStyle('editFontSize')} options={sizeOptions(9, 32)} /></Row>
+                  <Row label="색"><ColorInput value={s.editTextColor} onChange={setItemStyle('editTextColor')} /></Row>
+                  {ask && (
+                    <div className="apply-ask" role="alert">
+                      <p>입력창에서 <b>{ask.props.map((p) => Object.values(ITEM_PROP).find(([css]) => css === p)[1]).join('·')}</b>을(를) 직접 바꾼 일정이 있습니다 (최대 {ask.count}개). 그 일정에도 새 설정을 적용할까요?</p>
+                      <div className="inline">
+                        <button className="btn primary small" onClick={() => answer(true)}>모두 적용</button>
+                        <button className="btn small" onClick={() => answer(false)}>직접 바꾼 건 그대로</button>
+                      </div>
+                    </div>
+                  )}
                 </Section>
                 <Section title="기타 색상">
                   <Row label="캘린더 배경"><ColorInput value={s.bgColor} onChange={set('bgColor')} /></Row>
-                  <Row label="휴일 배경색"><ColorInput value={s.holidayBgColor} onChange={set('holidayBgColor')} /></Row>
+                  <Row label="토요일 배경색"><ColorInput value={s.saturdayBgColor} onChange={set('saturdayBgColor')} /></Row>
+                  <Row label="일요일·공휴일 배경색"><ColorInput value={s.sundayBgColor} onChange={set('sundayBgColor')} /></Row>
                   <Row label="오늘의 테두리"><ColorInput value={s.todayBorder} onChange={set('todayBorder')} /></Row>
                   <Row label="제목 표시줄 버튼 색상"><ColorInput value={s.titleButtonColor} onChange={set('titleButtonColor')} /></Row>
-                  <Row label="휴일 텍스트 색상"><ColorInput value={s.holidayTextColor} onChange={set('holidayTextColor')} /></Row>
-                  <Row label="24절기 텍스트 색상"><ColorInput value={s.solarTermColor} onChange={set('solarTermColor')} /></Row>
                 </Section>
                 <Section title="투명도">
                   <Row label="투명도"><Select value={s.opacity} onChange={set('opacity')} options={percent(0, 90, 10)} /></Row>
@@ -216,7 +326,7 @@ export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', on
                   <Row label="메모 투명도"><Select value={s.noteOpacity} onChange={set('noteOpacity')} options={percent(0, 90, 10)} /></Row>
                   <Row label="줄 간격"><Select value={s.noteLineSpacing} onChange={set('noteLineSpacing')} options={range(0, 6)} /></Row>
                   <Row label="편집 내용의 글꼴 크기 및 색상">
-                    <Select value={s.noteFontFamily} onChange={set('noteFontFamily')} options={fontOptions} />
+                    <FontSelect value={s.noteFontFamily} onChange={set('noteFontFamily')} />
                     <Select value={s.noteFontSize} onChange={set('noteFontSize')} options={range(10, 22, (n) => `${n}px`)} />
                     <ColorInput value={s.noteTextColor} onChange={set('noteTextColor')} />
                   </Row>
@@ -235,7 +345,7 @@ export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', on
                   <Row label="시작 요일">
                     <Select value={s.weekStart} onChange={set('weekStart')} options={WEEKDAYS.ko.map((label, value) => ({ value, label }))} />
                   </Row>
-                  <Row label="첫번째 주" hint="올해 X주차를 첫 번째 주로 설정합니다.">
+                  <Row label="첫번째 주" hint={`올해 X주차를 첫 번째 주로 설정합니다.${s.weekNumbers ? '' : ' (캘린더 탭에서 「주 번호」를 켜야 보입니다)'}`}>
                     <Select value={s.firstWeek} onChange={set('firstWeek')} options={range(1, 52)} />
                   </Row>
                 </Section>

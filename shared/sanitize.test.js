@@ -27,3 +27,11 @@ test('plain text extraction', () => {
 test('Korean font names survive', () => {
   assert.equal(sanitizeHtml(`<span style="font-family: Dotum, '돋움', sans-serif">a</span>`), `<span style="font-family: Dotum, '돋움', sans-serif">a</span>`);
 });
+
+import { stripStyles } from './sanitize.js';
+test('stripStyles removes only the requested properties', () => {
+  const html = '<span style="font-family: Gulim; font-size: 14pt; color: red; font-weight: bold">a</span><font color="#f00" face="Batang">b</font>';
+  assert.equal(stripStyles(html, ['color']), '<span style="font-family: Gulim; font-size: 14pt; font-weight: bold">a</span><font face="Batang">b</font>');
+  assert.equal(stripStyles(html, ['font-family', 'font-size']), '<span style="color: red; font-weight: bold">a</span><font color="#f00">b</font>');
+  assert.equal(stripStyles('<span style="color: red">x</span>', ['color']), '<span>x</span>');
+});

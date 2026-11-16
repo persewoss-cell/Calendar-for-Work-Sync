@@ -33,9 +33,11 @@ export const api = {
   deleteEvent: (id) => request('DELETE', `/api/events/${id}`),
   reorder: (ids) => request('POST', '/api/events/reorder', { ids }),
   rollover: (today) => request('POST', '/api/events/rollover', { today }),
+  styleUsage: () => request('GET', '/api/events/style-usage'),
+  stripStyle: (props) => request('POST', '/api/events/strip-style', { props }),
 
   days: (from, to) => request('GET', `/api/days?from=${from}&to=${to}`),
-  setDayBg: (date, bg) => request('PUT', `/api/days/${date}`, { bg }),
+  setDayStyle: (date, patch) => request('PUT', `/api/days/${date}`, patch),
 
   notes: () => request('GET', '/api/notes'),
   createNote: (n) => request('POST', '/api/notes', n),

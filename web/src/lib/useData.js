@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { api } from './api.js';
-import { mergeSettings } from './settings.js';
+import { mergeSettings, migrateSettings } from './settings.js';
 
 /** Loads the signed-in user's data and keeps it live across devices via socket.io. */
 export function useData(range) {
   const [me, setMe] = useState(undefined); // undefined = loading, null = signed out
   const [settings, setSettings] = useState(mergeSettings());
   const [events, setEvents] = useState([]);
-  const [days, setDays] = useState({}); // date → cell background color
+  const [days, setDays] = useState({}); // date → { bg, list } (cell color, list style)
   const [notes, setNotes] = useState([]);
   const [countdowns, setCountdowns] = useState([]);
   const [online, setOnline] = useState(true);
@@ -29,7 +29,7 @@ export function useData(range) {
     const { from, to } = rangeRef.current;
     try {
       const list = await api.days(from, to);
-      setDays(Object.fromEntries(list.map((d) => [d.date, d.bg])));
+      setDays(Object.fromEntries(list.map((d) => [d.date, { bg: d.bg || '', list: d.list || '' }])));
     } catch { /* ignore */ }
   }, []);
   const loadNotes = useCallback(() => api.notes().then(setNotes).catch(() => {}), []);
@@ -37,6 +37,11 @@ export function useData(range) {
   const loadMe = useCallback(async () => {
     try {
       const m = await api.me();
+      const patch = migrateSettings(m.settings);
+      if (patch) {
+        m.settings = { ...m.settings, ...patch };
+        api.saveSettings(patch).catch(() => {});
+      }
       setMe(m);
       setSettings(mergeSettings({ ...m.settings, ...pendingSettings.current }));
       return m;

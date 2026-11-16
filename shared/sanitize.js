@@ -71,3 +71,24 @@ export function htmlToText(html) {
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
     .trim();
 }
+
+/**
+ * Remove some inline styles (e.g. ['font-family', 'color']) from a fragment so the
+ * common item font / size / color shows through. Input is sanitized first.
+ */
+export function stripStyles(html, props) {
+  const drop = new Set(props);
+  const clean = sanitizeHtml(html);
+  return clean
+    .replace(/ style="([^"]*)"/g, (_, style) => {
+      const kept = style.split(';').map((d) => d.trim()).filter(Boolean)
+        .filter((d) => !drop.has(d.slice(0, d.indexOf(':')).trim()));
+      return kept.length ? ` style="${kept.join('; ')}"` : '';
+    })
+    .replace(/<font\b([^>]*)>/g, (_, attrs) => {
+      let a = attrs;
+      if (drop.has('color')) a = a.replace(/ color="[^"]*"/, '');
+      if (drop.has('font-family')) a = a.replace(/ face="[^"]*"/, '');
+      return `<font${a}>`;
+    });
+}

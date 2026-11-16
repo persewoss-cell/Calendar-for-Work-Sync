@@ -6,6 +6,17 @@ import { anchorFor, buildGrid, stepAnchor } from './lib/grid.js';
 import { addDays, diffDays, todayIn } from './lib/date.js';
 import { expandEvents, sortDay } from './lib/recurrence.js';
 
+/** CSS variables for each calendar text element: --t-title-size, --t-title-color, --t-title-weight … */
+function calTextVars(calText) {
+  const vars = {};
+  for (const [k, v] of Object.entries(calText)) {
+    vars[`--t-${k}-size`] = `${v.size}px`;
+    vars[`--t-${k}-color`] = v.color;
+    vars[`--t-${k}-weight`] = v.bold ? 700 : 400;
+  }
+  return vars;
+}
+
 const escapeHtml = (t) => String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 import { fontCss, hexToRgba, mergeSettings } from './lib/settings.js';
 import { playSound } from './lib/sound.js';
@@ -18,6 +29,7 @@ import { AccountDialog } from './components/AccountDialog.jsx';
 import { DateDialog, ExportDialog, HelpDialog, MobileDialog, SearchDialog } from './components/SmallDialogs.jsx';
 import { CardsLayer, CardsList, CountdownCard, StickyNote } from './components/Cards.jsx';
 import { DayEditor } from './components/DayEditor.jsx';
+import { ensureFonts, fontsInHtml } from './lib/fonts.js';
 import { LoginScreen } from './components/LoginScreen.jsx';
 import { Icon } from './components/Icon.jsx';
 import { Modal } from './components/Modal.jsx';
@@ -73,6 +85,11 @@ export default function App() {
   const [toasts, dismissToast] = useReminders(Boolean(me), s, events.length);
 
   const byDay = useMemo(() => expandEvents(events, realGrid.from, realGrid.to), [events, realGrid.from, realGrid.to]);
+
+  // Web fonts: load the ones chosen in settings and the ones used inside item text.
+  useEffect(() => {
+    ensureFonts([s.fontFamily, s.editFontFamily, s.noteFontFamily, ...events.flatMap((e) => fontsInHtml(e.html))]);
+  }, [s.fontFamily, s.editFontFamily, s.noteFontFamily, events]);
 
   const flash = useCallback((msg) => {
     setToast(msg);
@@ -152,9 +169,9 @@ export default function App() {
     return resolved;
   };
 
-  const setDayBg = useCallback((date, bg) => {
-    data.setDays((d) => ({ ...d, [date]: bg }));
-    run(api.setDayBg(date, bg));
+  const setDayStyle = useCallback((date, patch) => {
+    data.setDays((d) => ({ ...d, [date]: { bg: '', list: '', ...d[date], ...patch } }));
+    run(api.setDayStyle(date, patch));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -263,22 +280,29 @@ export default function App() {
   if (me === null) return <LoginScreen onLoggedIn={data.loadMe} />;
   if (collapsed) {
     return (
-      <div className={`collapsed-chip ${isDesktop ? 'is-desktop' : ''}`} onDoubleClick={toggleCollapsed} title="더블클릭하면 펼쳐집니다" role="button" aria-label="캘린더 펼치기">
-        <span className="app-mark" />
-      </div>
+      <button type="button" className={`collapsed-chip ${isDesktop ? 'is-desktop' : ''}`} onClick={toggleCollapsed} title="누르면 펼쳐집니다" aria-label="캘린더 펼치기">
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <rect width="64" height="64" fill="#1e88e5" />
+          <g fill="#fff">
+            <rect x="10" y="10" width="12" height="12" fill="#ffca28" /><rect x="26" y="10" width="12" height="12" fill="#ef5350" /><rect x="42" y="10" width="12" height="12" fill="#66bb6a" />
+            <rect x="10" y="26" width="12" height="12" /><rect x="26" y="26" width="12" height="12" /><rect x="42" y="26" width="12" height="12" />
+            <rect x="10" y="42" width="12" height="12" /><rect x="26" y="42" width="12" height="12" /><rect x="42" y="42" width="12" height="12" />
+          </g>
+        </svg>
+      </button>
     );
   }
 
   const alpha = (100 - s.opacity) / 100;
   const style = {
     '--font': fontCss(s.fontFamily),
-    '--font-size': `${s.fontSize}px`,
-    '--text': s.textColor,
+    ...calTextVars(s.calText),
     '--edit-font': fontCss(s.editFontFamily),
     '--edit-size': `${s.editFontSize}px`,
     '--edit-color': s.editTextColor,
     '--cell-bg': hexToRgba(s.bgColor, alpha),
-    '--rest-bg-alpha': hexToRgba(s.holidayBgColor, Math.min(1, alpha + 0.3)),
+    '--sat-bg': hexToRgba(s.saturdayBgColor, Math.min(1, alpha + 0.25)),
+    '--sun-bg': hexToRgba(s.sundayBgColor, Math.min(1, alpha + 0.25)),
     '--today-border': s.todayBorder,
     '--cell-pad': `${2 + s.cellPadding * 2}px`,
     '--line-gap': `${s.lineSpacing}px`,
@@ -332,12 +356,17 @@ export default function App() {
           items={sortDay(byDay.get(editor.date) || [], s.doneToBottom).filter((i) => !i.part || i.part[0] === 1)}
           s={s}
           anchorRect={editor.rect}
-          dayBg={data.days[editor.date] || ''}
+          dayBg={data.days[editor.date]?.bg || ''}
+          listStyle={data.days[editor.date]?.list || s.listStyle}
           compact={compact}
           onSave={(lines) => saveEditor(editor.date, lines)}
           onClose={() => setEditor(null)}
-          onSetBg={(bg) => setDayBg(editor.date, bg)}
-          onCycleList={() => updateSettings({ listStyle: { bullet: 'number', number: 'none', none: 'bullet' }[s.listStyle] || 'bullet' })}
+          onSetBg={(bg) => setDayStyle(editor.date, { bg })}
+          onCycleList={() => {
+            const cur = data.days[editor.date]?.list || s.listStyle;
+            const next = { bullet: 'number', number: 'none', none: 'bullet' }[cur] || 'bullet';
+            setDayStyle(editor.date, { list: next === s.listStyle ? '' : next }); // back to the setting → no override
+          }}
           onOpenDetail={(entry) => {
             const date = editor.date;
             setEditor(null);

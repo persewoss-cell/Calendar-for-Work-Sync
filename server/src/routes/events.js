@@ -2,7 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import { EDITABLE_EVENT_FIELDS, Event } from '../models/Event.js';
 import { notify } from '../lib/realtime.js';
-import { htmlToText, sanitizeHtml } from '../../../shared/sanitize.js';
+import { htmlToText, sanitizeHtml, stripStyles } from '../../../shared/sanitize.js';
 
 export const eventsRouter = Router();
 
@@ -44,6 +44,34 @@ eventsRouter.get('/search', async (req, res) => {
 
 eventsRouter.get('/export', async (req, res) => {
   res.json(await Event.find({ userId: req.user._id, deleted: false }).sort({ date: 1, order: 1 }).lean());
+});
+
+// How many items carry their own font / size / color (to ask before overriding them).
+const STYLE_PROPS = ['font-family', 'font-size', 'color'];
+const STYLE_RE = { 'font-family': /font-family|face=/, 'font-size': /font-size/, color: /(?:^|[^-])color|<font[^>]*color=/ };
+
+eventsRouter.get('/style-usage', async (req, res) => {
+  const items = await Event.find({ userId: req.user._id, deleted: false, html: { $ne: '' } }, 'html').lean();
+  const usage = Object.fromEntries(STYLE_PROPS.map((p) => [p, items.filter((e) => STYLE_RE[p].test(e.html)).length]));
+  res.json(usage);
+});
+
+// Remove the given inline styles from every item, so the common font/size/color applies.
+eventsRouter.post('/strip-style', async (req, res) => {
+  const props = (Array.isArray(req.body?.props) ? req.body.props : []).filter((p) => STYLE_PROPS.includes(p));
+  if (!props.length) return res.status(400).json({ error: 'props required' });
+  const items = await Event.find({ userId: req.user._id, deleted: false, html: { $ne: '' } }, 'html title');
+  let changed = 0;
+  for (const ev of items) {
+    const html = stripStyles(ev.html, props);
+    if (html !== ev.html) {
+      ev.html = html;
+      await ev.save();
+      changed++;
+    }
+  }
+  if (changed) notify(req.user._id, 'events');
+  res.json({ changed });
 });
 
 eventsRouter.post('/', async (req, res) => {

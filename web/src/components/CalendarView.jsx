@@ -27,11 +27,14 @@ export function CalendarView({ grid, s, today, anchor, byDay, days = {}, editing
 
   const rows = useMemo(() => grid.rows.map((row, r) => row.map((date, c) => {
     const info = dayInfo(date, s);
-    const isRest = (s.showRestDays && (s.restDays || []).includes(weekday(date)))
-      || info.holidays.some((h) => h.type === 'holiday');
+    // 쉬는 날: Saturday → 'sat' color; Sunday, other chosen rest days and public holidays → 'sun' color.
+    const wd = weekday(date);
+    let restKind = '';
+    if (s.showRestDays && (s.restDays || []).includes(wd)) restKind = wd === 6 ? 'sat' : 'sun';
+    if (info.holidays.some((h) => h.type === 'holiday')) restKind = 'sun';
     const day = Number(date.slice(8));
     const showMonth = day === 1 || (r === 0 && c === 0);
-    return { date, info, isRest, monthLabel: showMonth ? `${Number(date.slice(5, 7))}월` : null };
+    return { date, info, restKind, monthLabel: showMonth ? `${Number(date.slice(5, 7))}월` : null };
   })), [grid, s]);
 
   return (
@@ -50,20 +53,21 @@ export function CalendarView({ grid, s, today, anchor, byDay, days = {}, editing
             {showWeekCol && (
               <div className="week-col cell-week">{weekNumber(grid.rows[r][0], Number(s.weekStart), Number(s.firstWeek))}</div>
             )}
-            {row.map(({ date, info, isRest, monthLabel }) => (
+            {row.map(({ date, info, restKind, monthLabel }) => (
               <DayCell
                 key={date}
                 date={date}
                 today={today}
                 s={s}
                 info={info}
-                isRest={isRest}
+                restKind={restKind}
                 monthLabel={monthLabel}
                 inMonth={s.viewStyle !== 'month' || date.startsWith(anchorMonth)}
                 items={sortDay(byDay.get(date) || [], s.doneToBottom)}
                 editing={editingDate === date}
                 highlight={highlightDate === date}
-                dayBg={days[date] || ''}
+                dayBg={days[date]?.bg || ''}
+                dayList={days[date]?.list || ''}
                 compact={compact}
                 {...handlers}
               />

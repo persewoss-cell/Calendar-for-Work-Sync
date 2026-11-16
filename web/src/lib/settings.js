@@ -32,19 +32,26 @@ export const DEFAULT_SETTINGS = {
   editSound: 'tick',
   reminderSound: 'twinkle',
 
-  // 글꼴 및 색상
+  // 글꼴 및 색상 — 캘린더 글꼴: 달력의 제목·요일·날짜 등 (항목별 크기·색·굵기)
   fontFamily: 'Dotum',
-  fontSize: 13,
-  textColor: '#ffffff',
-  editFontFamily: 'Gulim',
-  editFontSize: 14,
+  calText: {
+    title: { size: 13, color: '#ffffff', bold: false }, // 상단 제목 (오늘은 …)
+    weekday: { size: 13, color: '#ffffff', bold: false }, // 요일
+    day: { size: 12, color: '#ffffff', bold: false }, // 날짜 숫자
+    month: { size: 12, color: '#ffffff', bold: false }, // 월 표시 (11월)
+    holiday: { size: 12, color: '#ffb300', bold: false }, // 휴일·기념일 이름
+    term: { size: 12, color: '#00c853', bold: false }, // 24절기
+    lunar: { size: 10, color: '#ffffff', bold: false }, // 음력
+  },
+  // 편집 내용 공통 글꼴 및 크기 — 내가 입력한 일정 글자의 기본 모양
+  editFontFamily: 'Dotum',
+  editFontSize: 13,
   editTextColor: '#ffffff',
   bgColor: '#1a8fd8',
-  holidayBgColor: '#3c5f8f',
+  saturdayBgColor: '#bbdefb', // 토요일 (연한 파랑)
+  sundayBgColor: '#ffcdd2', // 일요일·공휴일 (연한 빨강)
   todayBorder: '#fffde7',
   titleButtonColor: '#ffffff',
-  holidayTextColor: '#ffb300',
-  solarTermColor: '#00c853',
   opacity: 60,
   countdownOpacity: 40,
 
@@ -79,22 +86,41 @@ export const DEFAULT_SETTINGS = {
   showNotes: true,
 };
 
-export const FONTS = [
-  { value: 'Dotum', label: '돋움 (Dotum)', css: "Dotum, '돋움', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif" },
-  { value: 'Gulim', label: '굴림 (Gulim)', css: "Gulim, '굴림', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif" },
-  { value: 'Malgun Gothic', label: '맑은 고딕', css: "'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif" },
-  { value: 'Batang', label: '바탕 (Batang)', css: "Batang, '바탕', 'Nanum Myeongjo', serif" },
-  { value: 'Noto Sans KR', label: 'Noto Sans KR', css: "'Noto Sans KR', 'Malgun Gothic', sans-serif" },
-  { value: 'Nanum Gothic', label: '나눔고딕', css: "'Nanum Gothic', 'Malgun Gothic', sans-serif" },
-  { value: 'system', label: '시스템 기본', css: 'system-ui, sans-serif' },
-];
-export const fontCss = (name) => (FONTS.find((f) => f.value === name) || FONTS[0]).css;
+export { FONTS, fontCss } from './fonts.js';
 
 export function mergeSettings(saved = {}) {
+  const calText = {};
+  for (const [k, v] of Object.entries(DEFAULT_SETTINGS.calText)) calText[k] = { ...v, ...(saved.calText?.[k] || {}) };
   return {
     ...DEFAULT_SETTINGS,
     ...saved,
+    calText,
     shortcuts: { ...DEFAULT_SETTINGS.shortcuts, ...(saved.shortcuts || {}) },
+  };
+}
+
+/**
+ * Settings saved before the calendar text was split per element: carry the old single
+ * font size / colors over so nothing changes look on upgrade. Returns a patch or null.
+ */
+export function migrateSettings(saved = {}) {
+  if (saved.calText) return null;
+  const size = Number(saved.fontSize) || 13;
+  const color = saved.textColor || '#ffffff';
+  const base = { size, color, bold: false };
+  return {
+    calText: {
+      title: { ...base, size: Math.max(size, 13) },
+      weekday: { ...base, size: Math.max(size, 13) },
+      day: { ...base, size: Math.max(size - 1, 10) },
+      month: { ...base, size: Math.max(size - 1, 10) },
+      holiday: { ...base, size: Math.max(size - 1, 10), color: saved.holidayTextColor || '#ffb300' },
+      term: { ...base, size: Math.max(size - 1, 10), color: saved.solarTermColor || '#00c853' },
+      lunar: { ...base, size: 10 },
+    },
+    editFontFamily: saved.fontFamily || 'Dotum',
+    editFontSize: size,
+    editTextColor: color,
   };
 }
 

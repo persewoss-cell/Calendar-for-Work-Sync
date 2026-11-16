@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from './Icon.jsx';
-import { FONTS } from '../lib/settings.js';
+import { ensureFontPreviews, FONTS } from '../lib/fonts.js';
 import { htmlToText, sanitizeHtml } from '../../../shared/sanitize.js';
 import { parts } from '../lib/date.js';
 
@@ -59,13 +59,13 @@ function exec(cmd, value) {
   document.execCommand(cmd, false, value);
 }
 
-function Palette({ colors, onPick, allowNone, title }) {
+function Palette({ colors, onPick, allowNone, noneTitle = '없음', title }) {
   return (
     <div className="de-palette" onMouseDown={(e) => e.preventDefault()}>
       <div className="de-palette-title">{title}</div>
       <div className="de-swatches">
         {allowNone && (
-          <button type="button" className="de-swatch none" title="없음" onClick={() => onPick('')}><Icon name="x" size={12} /></button>
+          <button type="button" className="de-swatch none" title={noneTitle} aria-label={noneTitle} onClick={() => onPick('')}><Icon name="x" size={12} /></button>
         )}
         {colors.map((c) => <button type="button" key={c} className="de-swatch" style={{ background: c }} title={c} onClick={() => onPick(c)} />)}
       </div>
@@ -80,7 +80,7 @@ function Palette({ colors, onPick, allowNone, title }) {
  * Popup editor that opens when a date cell is double-clicked.
  * Enter saves and closes, Ctrl+Enter starts a new line (a new item).
  */
-export function DayEditor({ date, items, s, anchorRect, dayBg, compact, onSave, onClose, onSetBg, onCycleList, onOpenDetail }) {
+export function DayEditor({ date, items, s, anchorRect, dayBg, listStyle, compact, onSave, onClose, onSetBg, onCycleList, onOpenDetail }) {
   const root = useRef(null);
   const box = useRef(null);
   const saving = useRef(false);
@@ -223,10 +223,26 @@ export function DayEditor({ date, items, s, anchorRect, dayBg, compact, onSave, 
     setState((st) => ({ ...st, size }));
   };
 
-  const toggleDone = () => {
-    const lines = selectedLines();
-    const allDone = lines.every((l) => l.dataset.done === '1');
-    lines.forEach((l) => { if (allDone) delete l.dataset.done; else l.dataset.done = '1'; });
+  // 기본 색으로: remove the text color from the selection (or the current line).
+  const resetColor = () => {
+    selectWholeLineIfCollapsed();
+    exec('foreColor', '#010203'); // marker color, then strip it
+    root.current.querySelectorAll('[style*="color"], font[color]').forEach((el) => {
+      if (el.tagName === 'FONT' && /^#010203$/i.test(el.getAttribute('color') || '')) el.removeAttribute('color');
+      if (/rgb\(1, 2, 3\)/.test(el.style.color)) el.style.removeProperty('color');
+      if (el.tagName === 'SPAN' && !el.getAttribute('style')) el.replaceWith(...el.childNodes);
+    });
+    // Older colors nested inside the selection are cleared as well.
+    const sel = window.getSelection();
+    if (sel.rangeCount) {
+      const range = sel.getRangeAt(0);
+      root.current.querySelectorAll('[style*="color"], font[color]').forEach((el) => {
+        if (!range.intersectsNode(el)) return;
+        el.style?.removeProperty('color');
+        el.removeAttribute?.('color');
+        if (el.tagName === 'SPAN' && !el.getAttribute('style')) el.replaceWith(...el.childNodes);
+      });
+    }
   };
 
   const clearFormat = () => {
@@ -260,7 +276,7 @@ export function DayEditor({ date, items, s, anchorRect, dayBg, compact, onSave, 
   };
 
   return (
-    <div ref={box} className={`day-editor list-${s.listStyle} ${compact ? 'compact' : ''}`} style={{ left: pos.left, top: pos.top }}
+    <div ref={box} className={`day-editor list-${listStyle} ${compact ? 'compact' : ''}`} style={{ left: pos.left, top: pos.top }}
       role="dialog" aria-label={`${y}년 ${m}월 ${d}일 편집`}>
       <div className="de-head">
         <span className="de-date">{y}년 {m}월 {d}일</span>
@@ -276,7 +292,7 @@ export function DayEditor({ date, items, s, anchorRect, dayBg, compact, onSave, 
         suppressContentEditableWarning
         spellCheck={false}
         onKeyDown={onKeyDown}
-        style={{ fontFamily: 'var(--edit-font)', fontSize: `${Math.round(s.editFontSize * 0.75)}pt` }}
+        style={{ fontFamily: 'var(--edit-font)', fontSize: `${s.editFontSize}px` }}
       />
       <div className="de-hint">{compact ? 'Enter 줄바꿈 · ✓ 저장' : 'Enter 저장 · Ctrl+Enter 줄바꿈'}</div>
       <div className="de-tools">
@@ -292,7 +308,10 @@ export function DayEditor({ date, items, s, anchorRect, dayBg, compact, onSave, 
           <div className="de-pop">
             {btn('', '글자색', () => setMenu(menu === 'color' ? null : 'color'), menu === 'color',
               <span className="de-a">A<span className="de-a-bar" style={{ background: state.color }} /></span>)}
-            {menu === 'color' && <Palette title="글자색" colors={TEXT_COLORS} onPick={(c) => { exec('foreColor', c || '#000000'); setMenu(null); }} />}
+            {menu === 'color' && (
+              <Palette title="글자색" colors={TEXT_COLORS} allowNone noneTitle="기본 색으로 (색 지우기)"
+                onPick={(c) => { if (c) exec('foreColor', c); else resetColor(); setMenu(null); }} />
+            )}
           </div>
           <div className="de-pop">
             {btn('', '칸 배경색', () => setMenu(menu === 'bg' ? null : 'bg'), menu === 'bg',
@@ -300,11 +319,14 @@ export function DayEditor({ date, items, s, anchorRect, dayBg, compact, onSave, 
             {menu === 'bg' && <Palette title="칸 배경색" colors={CELL_COLORS} allowNone onPick={(c) => { onSetBg(c); setMenu(null); }} />}
           </div>
           <div className="de-pop">
-            {btn('', '글꼴', () => setMenu(menu === 'font' ? null : 'font'), menu === 'font', <span className="de-ga">가</span>)}
+            {btn('', '글꼴', () => { ensureFontPreviews(); setMenu(menu === 'font' ? null : 'font'); }, menu === 'font', <span className="de-ga">가</span>)}
             {menu === 'font' && (
               <div className="de-palette de-fonts" onMouseDown={keep}>
-                {FONTS.map((f) => (
-                  <button type="button" key={f.value} style={{ fontFamily: f.css }} onClick={() => { exec('fontName', f.css); setMenu(null); }}>{f.label}</button>
+                {FONTS.map((f, i) => (
+                  <div key={f.value}>
+                    {f.group !== FONTS[i - 1]?.group && <div className="de-palette-title">{f.group}</div>}
+                    <button type="button" style={{ fontFamily: f.css }} onClick={() => { exec('fontName', f.css); setMenu(null); }}>{f.label}</button>
+                  </div>
                 ))}
               </div>
             )}
@@ -320,8 +342,7 @@ export function DayEditor({ date, items, s, anchorRect, dayBg, compact, onSave, 
             <span className="de-pt">pt</span>
           </div>
           <span className="de-sep" />
-          {btn('checkSquare', '완료 체크 (지금 줄)', toggleDone)}
-          {btn('list', `목록 모양 바꾸기 (지금: ${{ bullet: '점', number: '번호', none: '없음' }[s.listStyle]})`, onCycleList)}
+          {btn('list', `이 날짜의 목록 모양 바꾸기 (지금: ${{ bullet: '점', number: '번호', none: '없음' }[listStyle]})`, onCycleList)}
           {btn('clearFormat', '서식 지우기', clearFormat)}
         </div>
       </div>
