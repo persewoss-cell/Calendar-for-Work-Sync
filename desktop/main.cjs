@@ -65,6 +65,28 @@ function pinToDesktop(win) {
   winDesktop.attachToDesktop(win);
 }
 
+/** All our desktop-layer windows (calendar + sticky notes / D-day cards). */
+function desktopWindows() {
+  return [mainWin, ...cardWins.values()].filter((w) => w && !w.isDestroyed());
+}
+
+/** Push every calendar window back under the other programs, unless the user is using one of them. */
+function keepAtBottom() {
+  const wins = desktopWindows();
+  if (moveMode || wins.some((w) => w.isFocused())) return;
+  wins.forEach((w) => winDesktop.sendToBottom(w));
+}
+
+let stopWatching = null;
+let bottomTimer = null;
+function startKeepingAtBottom() {
+  if (process.platform !== 'win32' || bottomTimer) return;
+  // Another program came to the front (e.g. an Explorer dialog) → make sure we did not come along.
+  stopWatching = winDesktop.watchForeground(() => setTimeout(keepAtBottom, 30));
+  // Safety net in case an event is missed. Cheap: a no-op when we are already at the bottom.
+  bottomTimer = setInterval(keepAtBottom, 1500);
+}
+
 // ---------- windows ----------
 function defaultBounds() {
   const { workArea } = screen.getPrimaryDisplay();
@@ -391,8 +413,13 @@ if (!app.requestSingleInstanceLock()) {
     else openSetup();
     // 「자동 업데이트 확인」 setting (remembered from the web app's settings).
     if (config.autoUpdate !== false) setTimeout(() => checkForUpdates(false), 5000);
+    startKeepingAtBottom();
   });
   app.on('window-all-closed', (e) => e.preventDefault?.());
   app.on('before-quit', () => { quitting = true; });
-  app.on('will-quit', () => globalShortcut.unregisterAll());
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
+    clearInterval(bottomTimer);
+    stopWatching?.();
+  });
 }

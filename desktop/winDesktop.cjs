@@ -20,7 +20,12 @@ function load() {
       SetWindowLongPtrW: user32.func('intptr_t __stdcall SetWindowLongPtrW(intptr_t hwnd, int index, intptr_t value)'),
       SetWindowPos: user32.func('bool __stdcall SetWindowPos(intptr_t hwnd, intptr_t after, int x, int y, int cx, int cy, uint32_t flags)'),
       IsWindow: user32.func('bool __stdcall IsWindow(intptr_t hwnd)'),
+      koffi,
     };
+    // SetWinEventHook: tells us whenever another window comes to the foreground.
+    api.WinEventProc = koffi.proto('void __stdcall WinEventProc(intptr_t hook, uint32_t event, intptr_t hwnd, int32_t idObject, int32_t idChild, uint32_t thread, uint32_t time)');
+    api.SetWinEventHook = user32.func('intptr_t __stdcall SetWinEventHook(uint32_t eventMin, uint32_t eventMax, intptr_t hmod, WinEventProc *proc, uint32_t pid, uint32_t tid, uint32_t flags)');
+    api.UnhookWinEvent = user32.func('bool __stdcall UnhookWinEvent(intptr_t hook)');
   } catch (err) {
     console.warn('[desktop] native desktop pinning unavailable:', err.message);
     api = null;
@@ -93,4 +98,39 @@ function ownerLost(owner) {
   }
 }
 
-module.exports = { attachToDesktop, sendToBottom, ownerLost, isSupported: () => Boolean(load()) };
+const EVENT_SYSTEM_FOREGROUND = 0x0003;
+const EVENT_SYSTEM_MINIMIZEEND = 0x0017;
+const WINEVENT_OUTOFCONTEXT = 0x0000;
+const WINEVENT_SKIPOWNPROCESS = 0x0002;
+
+let hook = null;
+let hookCallback = null; // must stay referenced, or it is garbage-collected while Windows still calls it
+
+/**
+ * Call `onOtherWindow(hwnd)` whenever a window of another program becomes the foreground
+ * window (e.g. an Explorer dialog popping up). Returns a function that stops watching.
+ */
+function watchForeground(onOtherWindow) {
+  const a = load();
+  if (!a || hook) return () => {};
+  try {
+    hookCallback = a.koffi.register((_hook, _event, hwnd) => {
+      try { onOtherWindow(hwnd); } catch { /* never throw into Windows */ }
+    }, a.koffi.pointer(a.WinEventProc));
+    hook = a.SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_MINIMIZEEND, 0, hookCallback, 0, 0,
+      WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+    if (isNull(hook)) throw new Error('SetWinEventHook returned 0');
+  } catch (err) {
+    console.warn('[desktop] foreground watch unavailable:', err.message);
+    hook = null;
+  }
+  return () => {
+    if (!hook) return;
+    try { a.UnhookWinEvent(hook); } catch { /* ignore */ }
+    try { a.koffi.unregister(hookCallback); } catch { /* ignore */ }
+    hook = null;
+    hookCallback = null;
+  };
+}
+
+module.exports = { attachToDesktop, sendToBottom, ownerLost, watchForeground, isSupported: () => Boolean(load()) };
