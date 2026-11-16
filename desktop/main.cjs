@@ -359,6 +359,12 @@ ipcMain.on('toggle-move', () => setMoveMode(!moveMode));
 ipcMain.on('set-collapsed', (_e, on) => setCollapsed(Boolean(on)));
 ipcMain.on('apply-settings', (_e, s) => applySettings(s));
 ipcMain.on('open-settings', (_e, tab) => openSettings(tab));
+ipcMain.on('activate-window', (e) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  if (!w || w.isDestroyed() || w.isFocused()) return;
+  w.focus(); // take keyboard input; the 'focus' handler then puts the calendar back under other windows
+  if (w === mainWin) winDesktop.sendToBottom(w);
+});
 ipcMain.on('settings-preview', (_e, patch) => mainWin?.webContents.send('settings-preview', patch));
 ipcMain.handle('save-server', async (_e, url) => {
   try {

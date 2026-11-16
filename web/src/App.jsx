@@ -323,13 +323,8 @@ export default function App() {
     goToday: () => { setAnchor(null); setHighlight(today); setTimeout(() => setHighlight(null), 1500); },
     step: (dir) => setAnchor(stepAnchor(sv, anchorRaw ?? anchorFor(sv, today), dir)),
     openEvent: (item) => setDialog({ type: 'event', item, alarm: true }),
-    // Trash in the 알림 list: switch the alarm off (the item stays on the calendar).
-    removeReminder: (item) => {
-      const msg = item.rrule
-        ? `반복 일정 「${item.title}」의 알림을 지울까요?\n(모든 반복 날짜의 알림이 꺼지고, 일정은 달력에 남습니다)`
-        : `「${item.title}」의 알림을 지울까요?\n(일정은 달력에 남습니다)`;
-      if (window.confirm(msg)) updateEvent(item._id, { reminder: null });
-    },
+    // Trash in the 알림 list: ask whether to remove just the alarm or the item as well.
+    removeReminder: (item) => setDialog({ type: 'removeAlarm', item }),
     newReminder: () => setDialog({ type: 'event', item: { date: today, startTime: '09:00', reminder: 10 }, alarm: true }),
     collapse: toggleCollapsed,
     openMobile: () => setDialog({ type: 'mobile' }),
@@ -426,6 +421,33 @@ export default function App() {
       )}
       {dialog?.type === 'mobile' && <MobileDialog onClose={() => setDialog(null)} />}
       {dialog?.type === 'help' && <HelpDialog onClose={() => setDialog(null)} />}
+      {dialog?.type === 'removeAlarm' && (() => {
+        const it = dialog.item;
+        const done = (fn) => { fn(); playSound(s.editSound); setDialog(null); };
+        return (
+          <Modal title="알림 지우기" onClose={() => setDialog(null)} width={400}
+            footer={(
+              <>
+                <button className="btn" onClick={() => setDialog(null)}>취소</button>
+                <button className="btn primary" onClick={() => done(() => updateEvent(it._id, { reminder: null }))}>알림만 지우기</button>
+              </>
+            )}>
+            <p className="remove-alarm-q">「{it.title}」의 알림을 지웁니다.<br />달력의 일정도 함께 지울까요?</p>
+            <div className="remove-alarm-choices">
+              {it.rrule ? (
+                <>
+                  <button className="btn danger" onClick={() => done(() => deleteOccurrence(it, 'occurrence'))}>이 날짜({it.day || it.occ}) 일정 삭제</button>
+                  <button className="btn danger" onClick={() => done(() => deleteOccurrence(it, 'all'))}>반복 일정 전체 삭제</button>
+                </>
+              ) : (
+                <button className="btn danger" onClick={() => done(() => deleteOccurrence(it, 'all'))}>일정까지 삭제</button>
+              )}
+            </div>
+            <p className="muted remove-alarm-note">「알림만 지우기」를 누르면 일정은 달력에 그대로 남고 알림만 꺼집니다.</p>
+          </Modal>
+        );
+      })()}
+
       <div className="toasts">
         {toast && <div className="toast">{toast}</div>}
         {toasts.map((t) => (

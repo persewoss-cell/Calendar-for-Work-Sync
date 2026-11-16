@@ -602,3 +602,7 @@ body.settings-window-body { background: #d4d9e0; }
 .allday-remind .input[type=date] { width: 150px; }
 .remind-del { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; color: #9aa3ad; }
 .remind-del:hover { background: #ffebee; color: #e53935; }
+.remove-alarm-q { margin: 0 0 12px; line-height: 1.6; }
+.remove-alarm-choices { display: flex; flex-direction: column; gap: 8px; }
+.remove-alarm-choices .btn { justify-content: center; border-color: #f3c1c1; }
+.remove-alarm-note { font-size: 12px; margin: 12px 0 0; }

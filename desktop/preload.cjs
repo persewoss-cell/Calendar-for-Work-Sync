@@ -41,6 +41,12 @@ ipcRenderer.on('move-mode', (_e, on) => {
 });
 
 window.addEventListener('DOMContentLoaded', () => {
+  // The calendar sits on the desktop layer and is shown without taking focus, so Windows may not
+  // route keystrokes to it. Whenever a text field gets focus, make sure the window is the active one.
+  document.addEventListener('focusin', (e) => {
+    const t = e.target;
+    if (t && (t.matches?.('input, textarea, select') || t.isContentEditable)) ipcRenderer.send('activate-window');
+  });
   document.body.classList.add('desktop-shell');
   const style = document.createElement('style');
   style.textContent = `
