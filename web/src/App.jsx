@@ -29,6 +29,7 @@ import { AccountDialog } from './components/AccountDialog.jsx';
 import { DateDialog, ExportDialog, HelpDialog, MobileDialog, SearchDialog } from './components/SmallDialogs.jsx';
 import { CardsLayer, CardsList, CountdownCard, StickyNote } from './components/Cards.jsx';
 import { DayEditor } from './components/DayEditor.jsx';
+import { MobileShell } from './components/Mobile.jsx';
 import { ensureFonts, fontsInHtml } from './lib/fonts.js';
 import { LoginScreen } from './components/LoginScreen.jsx';
 import { Icon } from './components/Icon.jsx';
@@ -71,12 +72,17 @@ export default function App() {
   useEffect(() => { setTz(s.timezone); }, [s.timezone]);
   useEffect(() => { setAnchor(null); }, [s.viewStyle]);
 
-  const realGrid = useMemo(() => buildGrid(s, anchorRaw ?? anchorFor(s, today)), [s, anchorRaw, today]);
+  const compact = useIsCompact();
+  const phone = compact && !isDesktop;
+  // On the phone the calendar is always a full month (like the original phone app).
+  const sv = useMemo(() => (phone ? { ...s, viewStyle: 'month', maxRows: 0 } : s), [s, phone]);
+  useEffect(() => { setAnchor(null); }, [phone]);
+  useEffect(() => { document.body.classList.toggle('phone-body', phone); }, [phone]);
+  const realGrid = useMemo(() => buildGrid(sv, anchorRaw ?? anchorFor(sv, today)), [sv, anchorRaw, today]);
   useEffect(() => {
     if (realGrid.from !== range.from || realGrid.to !== range.to) setRange({ from: realGrid.from, to: realGrid.to });
   }, [realGrid.from, realGrid.to, range.from, range.to]);
 
-  const compact = useIsCompact();
   const [editor, setEditor] = useState(null); // { date, rect } of the open day editor
   const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('collapsed') === '1'; } catch { return false; } });
   const [dialog, setDialog] = useState(null); // { type, ...props }
@@ -243,8 +249,8 @@ export default function App() {
         if (sc.enabled && name !== 'finishEdit' && match(e, sc.keys)) { e.preventDefault(); shortcutAction(name); }
       }
       if (!e.target.closest?.('input, textarea, select') && !dialog) {
-        if (e.key === 'ArrowLeft') setAnchor(stepAnchor(s, anchorRaw ?? anchorFor(s, today), -1));
-        if (e.key === 'ArrowRight') setAnchor(stepAnchor(s, anchorRaw ?? anchorFor(s, today), 1));
+        if (e.key === 'ArrowLeft') setAnchor(stepAnchor(sv, anchorRaw ?? anchorFor(sv, today), -1));
+        if (e.key === 'ArrowRight') setAnchor(stepAnchor(sv, anchorRaw ?? anchorFor(sv, today), 1));
       }
     };
     window.addEventListener('keydown', onKey);
@@ -264,7 +270,7 @@ export default function App() {
   }, [me, s.showNotes, data.notes, data.countdowns]);
 
   const goTo = (date) => {
-    setAnchor(anchorFor(s, date));
+    setAnchor(anchorFor(sv, date));
     setHighlight(date);
     setTimeout(() => setHighlight(null), 2500);
     setDialog(null);
@@ -283,11 +289,7 @@ export default function App() {
       <button type="button" className={`collapsed-chip ${isDesktop ? 'is-desktop' : ''}`} onClick={toggleCollapsed} title="누르면 펼쳐집니다" aria-label="캘린더 펼치기">
         <svg viewBox="0 0 64 64" aria-hidden="true">
           <rect width="64" height="64" fill="#1e88e5" />
-          <g fill="#fff">
-            <rect x="10" y="10" width="12" height="12" fill="#ffca28" /><rect x="26" y="10" width="12" height="12" fill="#ef5350" /><rect x="42" y="10" width="12" height="12" fill="#66bb6a" />
-            <rect x="10" y="26" width="12" height="12" /><rect x="26" y="26" width="12" height="12" /><rect x="42" y="26" width="12" height="12" />
-            <rect x="10" y="42" width="12" height="12" /><rect x="26" y="42" width="12" height="12" /><rect x="42" y="42" width="12" height="12" />
-          </g>
+          <rect x="16.4" y="16.4" width="8.4" height="8.4" rx="1.8" fill="#ffca28" /><rect x="27.8" y="16.4" width="8.4" height="8.4" rx="1.8" fill="#ef5350" /><rect x="39.2" y="16.4" width="8.4" height="8.4" rx="1.8" fill="#66bb6a" /><rect x="16.4" y="27.8" width="8.4" height="8.4" rx="1.8" fill="#fff" /><rect x="27.8" y="27.8" width="8.4" height="8.4" rx="1.8" fill="#fff" /><rect x="39.2" y="27.8" width="8.4" height="8.4" rx="1.8" fill="#fff" /><rect x="16.4" y="39.2" width="8.4" height="8.4" rx="1.8" fill="#fff" /><rect x="27.8" y="39.2" width="8.4" height="8.4" rx="1.8" fill="#fff" /><rect x="39.2" y="39.2" width="8.4" height="8.4" rx="1.8" fill="#fff" />
         </svg>
       </button>
     );
@@ -312,7 +314,7 @@ export default function App() {
 
   const actions = {
     goToday: () => { setAnchor(null); setHighlight(today); setTimeout(() => setHighlight(null), 1500); },
-    step: (dir) => setAnchor(stepAnchor(s, anchorRaw ?? anchorFor(s, today), dir)),
+    step: (dir) => setAnchor(stepAnchor(sv, anchorRaw ?? anchorFor(sv, today), dir)),
     newNote: noteActions.create,
     newCountdown: countdownActions.create,
     toggleNotes: () => updateSettings({ showNotes: !s.showNotes }),
@@ -334,20 +336,32 @@ export default function App() {
     logout,
   };
 
+  const main = phone ? (
+    <MobileShell
+      me={me} s={s} today={today} anchor={anchorRaw ?? anchorFor(sv, today)} grid={realGrid} byDay={byDay} days={data.days}
+      version={events} notes={data.notes} countdowns={data.countdowns} noteActions={noteActions} countdownActions={countdownActions}
+      online={data.online} actions={actions}
+      onStep={actions.step} onToday={() => setAnchor(null)}
+      onOpenDay={(date) => setEditor({ date, rect: null })}
+      onNewEvent={(extra) => setDialog({ type: 'event', item: { date: today, ...extra } })}
+      onOpenEvent={(item) => setDialog({ type: 'event', item })}
+    />
+  ) : null;
+
   return (
-    <div className={classes} style={style}>
-      <Toolbar s={s} today={today} anchor={anchorRaw ?? anchorFor(s, today)} actions={actions} />
+    <div className={phone ? 'app phone' : classes} style={style}>
+      {main}
+      {!phone && <>
+      <Toolbar s={s} today={today} anchor={anchorRaw ?? anchorFor(sv, today)} actions={actions} />
       <CalendarView
-        grid={realGrid} s={s} today={today} anchor={anchorRaw ?? anchorFor(s, today)} byDay={byDay}
+        grid={realGrid} s={s} today={today} anchor={anchorRaw ?? anchorFor(sv, today)} byDay={byDay}
         days={data.days} editingDate={editor?.date} highlightDate={highlight} compact={compact} handlers={handlers}
       />
       {!data.online && <div className="offline">서버에 연결할 수 없습니다. 다시 연결 중…</div>}
       {s.showNotes && !isDesktop && !compact && (
         <CardsLayer notes={data.notes} countdowns={data.countdowns} s={s} noteActions={noteActions} countdownActions={countdownActions} />
       )}
-      {compact && (data.notes.length > 0 || data.countdowns.length > 0) && (
-        <button className="fab" onClick={actions.openCards} aria-label="메모와 D-day"><Icon name="note" /></button>
-      )}
+      </>}
 
       {editor && (
         <DayEditor
