@@ -34,6 +34,7 @@ function DdayForm({ initial, onSubmit, onCancel, submitLabel }) {
 /** D-day list: add, edit, delete, and switch "오늘 칸에 표시" (the eye) per item. */
 export function DdayList({ countdowns, today, actions }) {
   const [editing, setEditing] = useState(null); // id | 'new' | null
+  const [confirmId, setConfirmId] = useState(null); // row asking 삭제할까요?
   // Upcoming first (nearest on top), passed ones at the bottom (most recent first).
   const rank = (c) => { const n = daysLeft(c, today); return n >= 0 ? n : 100000 - n; };
   const sorted = [...countdowns].sort((a, b) => rank(a) - rank(b));
@@ -62,8 +63,14 @@ export function DdayList({ countdowns, today, actions }) {
               <Icon name={shown ? 'eye' : 'eyeOff'} size={15} />
             </button>
             <button type="button" className="icon-btn tiny dark" title="수정" onClick={() => setEditing(c._id)}><Icon name="settings" size={14} /></button>
-            <button type="button" className="icon-btn tiny dark" title="삭제"
-              onClick={() => window.confirm(`D-day 「${c.title}」을(를) 삭제할까요?`) && actions.remove(c._id)}><Icon name="trash" size={14} /></button>
+            <button type="button" className="icon-btn tiny dark" title="삭제" onClick={() => setConfirmId(c._id)}><Icon name="trash" size={14} /></button>
+            {confirmId === c._id && (
+              <div className="dday-confirm" role="alertdialog" aria-label="D-day 삭제 확인">
+                <span>「{c.title}」 삭제할까요?</span>
+                <button type="button" className="btn small" onClick={() => setConfirmId(null)}>취소</button>
+                <button type="button" className="btn small danger-fill" onClick={() => { setConfirmId(null); actions.remove(c._id); }}>삭제</button>
+              </div>
+            )}
           </div>
         );
       })}

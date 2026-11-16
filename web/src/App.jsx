@@ -347,6 +347,12 @@ export default function App() {
     step: (dir) => setAnchor(stepAnchor(sv, anchorRaw ?? anchorFor(sv, today), dir)),
     openEvent: (item) => setDialog({ type: 'event', item, alarm: true }),
     // Trash in the 알림 list: ask whether to remove just the alarm or the item as well.
+    // Sync button: reload from the server, then a short notice.
+    sync: async () => {
+      if (data.refreshing) return;
+      const ok = await data.refresh();
+      flash(ok ? '동기화되었습니다.' : '서버에 연결하는 중입니다. 잠시 후 다시 눌러 주세요.');
+    },
     removeReminder: (item) => setDialog({ type: 'removeAlarm', item }),
     newReminder: () => setDialog({ type: 'event', item: { date: today, startTime: '09:00', reminder: 10 }, alarm: true }),
     collapse: toggleCollapsed,
@@ -370,7 +376,7 @@ export default function App() {
     <MobileShell
       me={me} s={s} today={today} anchor={anchorRaw ?? anchorFor(sv, today)} grid={realGrid} byDay={byDay} days={data.days}
       version={events} countdowns={data.countdowns} countdownActions={countdownActions}
-      online={data.online} actions={actions}
+      syncing={data.syncing} actions={actions}
       onStep={actions.step} onToday={() => setAnchor(null)}
       onOpenDay={(date) => setEditor({ date, rect: null })}
       onNewEvent={(extra) => setDialog({ type: 'event', item: { date: today, ...extra }, alarm: Boolean(extra?.reminder != null) })}
@@ -383,12 +389,11 @@ export default function App() {
       {main}
       {!phone && <>
       <Toolbar s={s} today={today} anchor={anchorRaw ?? anchorFor(sv, today)} actions={actions}
-        countdowns={data.countdowns} ddayActions={countdownActions} version={events} />
+        countdowns={data.countdowns} ddayActions={countdownActions} version={events} syncing={data.syncing} />
       <CalendarView
         grid={realGrid} s={s} today={today} anchor={anchorRaw ?? anchorFor(sv, today)} byDay={byDay}
         days={data.days} countdowns={data.countdowns} editingDate={editor?.date} highlightDate={highlight} compact={compact} handlers={handlers}
       />
-      {!data.online && <div className="offline">서버에 연결할 수 없습니다. 다시 연결 중…</div>}
       </>}
 
       {editor && (

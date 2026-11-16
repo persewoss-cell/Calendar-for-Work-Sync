@@ -181,6 +181,10 @@ function createMainWindow() {
     pinToDesktop(mainWin);
   });
   mainWin.on('show', () => pinToDesktop(mainWin));
+  // Tell the page when the user clicks another program or the desktop, so open popups close.
+  mainWin.on('blur', () => setTimeout(() => {
+    if (mainWin && !mainWin.isDestroyed() && !mainWin.isFocused()) mainWin.webContents.send('window-blur');
+  }, 150));
   // Clicking the calendar must not lift it above other programs.
   mainWin.on('focus', () => winDesktop.sendToBottom(mainWin));
   // The window can only be moved/resized by the user in 위치 및 크기 mode. Moves at other times come

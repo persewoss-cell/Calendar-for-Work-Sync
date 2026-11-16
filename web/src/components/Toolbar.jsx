@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon.jsx';
-import { isDesktop } from '../lib/desktop.js';
+import { desktop, isDesktop } from '../lib/desktop.js';
 import { WEEKDAYS, parts, weekday } from '../lib/date.js';
 import { DdayList, RemindersList } from './Panels.jsx';
 
@@ -19,6 +19,24 @@ function Dropdown({ icon, title, children, badge, color, panel }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   const ref = useOutside(open, close);
+  useEffect(() => {
+    if (!open) return undefined;
+    // Clicking another program or the desktop takes focus from the window: close the popup.
+    // (Not for a moment-long blur such as a confirm box, nor while a date/time picker is open.)
+    const onBlur = () => setTimeout(() => {
+      const a = document.activeElement;
+      if (a && ref.current?.contains(a) && /^(date|time)$/.test(a.type)) return;
+      if (!document.hasFocus()) setOpen(false);
+    }, 150);
+    window.addEventListener('blur', onBlur);
+    // Desktop app: the window lost focus at the OS level (more reliable than the page's own blur).
+    const offDesktop = desktop?.onWindowBlur?.(() => {
+      const a = document.activeElement;
+      if (a && ref.current?.contains(a) && /^(date|time)$/.test(a.type)) return;
+      setOpen(false);
+    });
+    return () => { window.removeEventListener('blur', onBlur); offDesktop?.(); };
+  }, [open, ref]);
   return (
     <div className="dropdown" ref={ref}>
       <button className={`icon-btn ${open ? 'pressed' : ''}`} style={{ color }} title={title} aria-label={title} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
@@ -40,7 +58,7 @@ const Item = ({ icon, children, onClick, right, disabled }) => (
   </button>
 );
 
-export function Toolbar({ s, today, anchor, actions, countdowns, ddayActions, version }) {
+export function Toolbar({ s, today, anchor, actions, countdowns, ddayActions, version, syncing }) {
   const [y, m, d] = parts(today);
   const wd = (s.language === 'en' ? WEEKDAYS.en : WEEKDAYS.ko)[weekday(today)];
   const title = s.language === 'en' ? `Today is ${wd}, ${today}` : `오늘은 ${y}년${m}월${d}일 ${wd}`;
@@ -63,6 +81,10 @@ export function Toolbar({ s, today, anchor, actions, countdowns, ddayActions, ve
       </div>
       <button className="tb-title" onClick={actions.goToday} title="오늘로 이동">{title}</button>
       <div className="tb-right" style={{ color }}>
+        <button className={`icon-btn sync-btn ${syncing ? 'syncing' : ''}`} style={{ color }} aria-label="동기화"
+          title={syncing ? '서버와 동기화하는 중…' : '눌러서 서버와 다시 동기화'} onClick={actions.sync}>
+          <Icon name="sync" size={18} className={syncing ? 'spin' : ''} />
+        </button>
         <Dropdown icon="bell" title="알림" color={color} panel>
           {(close) => (
             <RemindersList today={today} version={version}

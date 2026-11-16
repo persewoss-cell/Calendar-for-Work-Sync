@@ -10,6 +10,11 @@ contextBridge.exposeInMainWorld('workcalDesktop', {
   applySettings: (settings) => ipcRenderer.send('apply-settings', JSON.parse(JSON.stringify(settings))),
   openSettings: (tab) => ipcRenderer.send('open-settings', String(tab || 'calendar')),
   previewSettings: (patch) => ipcRenderer.send('settings-preview', JSON.parse(JSON.stringify(patch))),
+  onWindowBlur: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on('window-blur', handler);
+    return () => ipcRenderer.removeListener('window-blur', handler);
+  },
   onSettingsPreview: (cb) => {
     const handler = (_e, patch) => cb(patch);
     ipcRenderer.on('settings-preview', handler);

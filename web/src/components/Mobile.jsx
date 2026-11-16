@@ -87,7 +87,7 @@ const TABS = [
 /** Phone layout: light theme, month grid with item chips, bottom tabs. */
 export function MobileShell({
   me, s, today, anchor, grid, byDay, days, version, countdowns, countdownActions,
-  onStep, onToday, onOpenDay, onNewEvent, onOpenEvent, actions, online,
+  onStep, onToday, onOpenDay, onNewEvent, onOpenEvent, actions, syncing,
 }) {
   const [tab, setTab] = useState(() => {
     let t = 'calendar';
@@ -112,13 +112,17 @@ export function MobileShell({
         {tab === 'calendar' ? (
           <button type="button" className="m-title" onClick={actions.openDate}>{y}년 {m}월 <span className="m-caret">▾</span></button>
         ) : (
-          <span className="m-title center">{TABS.find((t) => t.id === tab).label}</span>
+          <>
+            <span className="m-title center">{TABS.find((t) => t.id === tab).label}</span>
+            <button type="button" className="m-sync-corner" aria-label="동기화" onClick={actions.sync}><Icon name="sync" size={20} className={syncing ? 'spin' : ''} /></button>
+          </>
         )}
         {tab === 'calendar' && (
           <div className="m-head-actions">
             <button type="button" aria-label="이전 달" onClick={() => onStep(-1)}><Icon name="left" size={20} /></button>
             <button type="button" className="m-today" onClick={onToday}>오늘</button>
             <button type="button" aria-label="다음 달" onClick={() => onStep(1)}><Icon name="right" size={20} /></button>
+            <button type="button" aria-label="동기화" onClick={actions.sync}><Icon name="sync" size={20} className={syncing ? 'spin' : ''} /></button>
             <button type="button" aria-label="메뉴" onClick={() => setMenu((v) => !v)}><Icon name="menu" size={24} /></button>
             {menu && (
               <div className="menu m-menu" onClick={() => setMenu(false)}>
@@ -133,7 +137,6 @@ export function MobileShell({
           </div>
         )}
       </header>
-      {!online && <div className="m-offline">서버에 연결할 수 없습니다. 다시 연결 중…</div>}
 
       <main className="m-body">
         {tab === 'calendar' && (

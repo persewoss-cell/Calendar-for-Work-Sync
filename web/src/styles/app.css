@@ -610,3 +610,8 @@ body.settings-window-body { background: #d4d9e0; }
 .duration label { display: inline-flex; align-items: center; gap: 4px; }
 .duration .input { width: 62px; text-align: center; }
 .duration.off { opacity: .5; }
+.m-sync-corner { position: absolute; right: 14px; top: calc(14px + env(safe-area-inset-top)); width: 34px; height: 34px; border: 0; background: none; color: #333; display: grid; place-items: center; }
+.dday-row { position: relative; }
+.dday-confirm { position: absolute; inset: 0; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 8px; background: #fff3f3; border: 1px solid #f5c2c2; font-size: 13px; }
+.dday-confirm span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn.danger-fill { background: #e53935; border-color: #e53935; color: #fff; }

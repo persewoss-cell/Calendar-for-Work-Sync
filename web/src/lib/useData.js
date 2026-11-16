@@ -11,6 +11,7 @@ export function useData(range) {
   const [days, setDays] = useState({}); // date → { bg, list } (cell color, list style)
   const [countdowns, setCountdowns] = useState([]);
   const [online, setOnline] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const rangeRef = useRef(range);
   rangeRef.current = range;
   const saveTimer = useRef(null);
@@ -51,16 +52,22 @@ export function useData(range) {
   }, []);
 
   useEffect(() => { loadMe(); }, [loadMe]);
-  useEffect(() => { if (me) { loadEvents(); loadDays(); } }, [me, range.from, range.to, loadEvents, loadDays]);
-  useEffect(() => { if (me) loadCountdowns(); }, [me, loadCountdowns]);
+  const signedIn = me?.id;
+  useEffect(() => { if (signedIn) { loadEvents(); loadDays(); } }, [signedIn, range.from, range.to, loadEvents, loadDays]);
+  useEffect(() => { if (signedIn) loadCountdowns(); }, [signedIn, loadCountdowns]);
 
+  // One socket per signed-in user. Depend on the id only: reloading the account (e.g. after a
+  // settings change or a reconnect) creates a new `me` object and must not reconnect the socket.
+  const userId = me?.id;
   useEffect(() => {
-    if (!me) return undefined;
+    if (!userId) return undefined;
     const socket = io({ path: '/socket.io', withCredentials: true });
     const timers = {};
     const debounce = (key, fn) => { clearTimeout(timers[key]); timers[key] = setTimeout(fn, 250); };
-    socket.on('connect', () => { setOnline(true); loadEvents(); });
+    // (Re)connected: reload everything, since changes may have been missed while away.
+    socket.on('connect', () => { setOnline(true); loadMe(); loadEvents(); loadDays(); loadCountdowns(); });
     socket.on('disconnect', () => setOnline(false));
+    socket.on('connect_error', () => setOnline(false)); // e.g. the server is still waking up
     socket.on('changed', ({ kind }) => {
       if (kind === 'events') debounce('events', loadEvents);
       if (kind === 'days') debounce('days', loadDays);
@@ -73,7 +80,7 @@ export function useData(range) {
       socket.close();
       window.removeEventListener('focus', onFocus);
     };
-  }, [me, loadEvents, loadDays, loadCountdowns, loadMe]);
+  }, [userId, loadEvents, loadDays, loadCountdowns, loadMe]);
 
   const updateSettings = useCallback((patch) => {
     setSettings((cur) => mergeSettings({ ...cur, ...patch }));
@@ -86,12 +93,34 @@ export function useData(range) {
     }, 400);
   }, []);
 
+  /** Reload everything from the server. Resolves true when the server answered. */
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    const started = Date.now();
+    let ok = false;
+    try {
+      const m = await loadMe();
+      if (m) {
+        await Promise.all([loadEvents(), loadDays(), loadCountdowns()]);
+        ok = true;
+        setOnline(true);
+      }
+    } finally {
+      // Spin long enough to be seen.
+      const left = 700 - (Date.now() - started);
+      if (left > 0) await new Promise((r) => setTimeout(r, left));
+      setRefreshing(false);
+    }
+    return ok;
+  }, [loadMe, loadEvents, loadDays, loadCountdowns]);
+
   // Apply settings sent from the desktop settings window (it saves them itself).
   const previewSettings = useCallback((patch) => setSettings((cur) => mergeSettings({ ...cur, ...patch })), []);
 
   return {
     me, setMe, loadMe, settings, updateSettings, previewSettings, events, setEvents, loadEvents, days, setDays,
     countdowns, setCountdowns, loadCountdowns,
-    online,
+    online, refreshing, refresh,
+    syncing: refreshing || !online,
   };
 }
