@@ -5,6 +5,8 @@ import { api } from './lib/api.js';
 import { anchorFor, buildGrid, stepAnchor } from './lib/grid.js';
 import { addDays, diffDays, todayIn } from './lib/date.js';
 import { expandEvents, sortDay } from './lib/recurrence.js';
+
+const escapeHtml = (t) => String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 import { fontCss, hexToRgba, mergeSettings } from './lib/settings.js';
 import { playSound } from './lib/sound.js';
 import { desktop, isDesktop } from './lib/desktop.js';
@@ -15,7 +17,7 @@ import { SettingsDialog } from './components/SettingsDialog.jsx';
 import { AccountDialog } from './components/AccountDialog.jsx';
 import { DateDialog, ExportDialog, HelpDialog, MobileDialog, SearchDialog } from './components/SmallDialogs.jsx';
 import { CardsLayer, CardsList, CountdownCard, StickyNote } from './components/Cards.jsx';
-import { DaySheet } from './components/DaySheet.jsx';
+import { DayEditor } from './components/DayEditor.jsx';
 import { LoginScreen } from './components/LoginScreen.jsx';
 import { Icon } from './components/Icon.jsx';
 import { Modal } from './components/Modal.jsx';
@@ -63,7 +65,8 @@ export default function App() {
   }, [realGrid.from, realGrid.to, range.from, range.to]);
 
   const compact = useIsCompact();
-  const [editingDate, setEditingDate] = useState(null);
+  const [editor, setEditor] = useState(null); // { date, rect } of the open day editor
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('collapsed') === '1'; } catch { return false; } });
   const [dialog, setDialog] = useState(null); // { type, ...props }
   const [highlight, setHighlight] = useState(null);
   const [toast, setToast] = useState('');
@@ -80,7 +83,7 @@ export default function App() {
   const patchLocal = (id, patch) => setEvents((list) => list.map((e) => (e._id === id ? { ...e, ...patch } : e)));
   const run = (p) => p.catch((e) => { flash(`저장 실패: ${e.message}`); data.loadEvents(); });
 
-  const createEvent = (ev) => run(api.createEvent(ev).then((created) => setEvents((l) => [...l, created])));
+  const createEvent = (ev) => run(api.createEvent(ev).then((created) => { setEvents((l) => [...l, created]); return created; }));
   const updateEvent = (id, patch) => { patchLocal(id, patch); return run(api.updateEvent(id, patch)); };
   const deleteOccurrence = (item, scope) => {
     if (item.rrule && scope === 'occurrence') return updateEvent(item._id, { exdates: [...(item.exdates || []), item.occ] });
@@ -100,34 +103,60 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.editSound]);
 
-  const commitCell = useCallback(async (date, items, rows) => {
-    setEditingDate(null);
-    const originals = items.filter((i) => !i.part || i.part[0] === 1);
+  // Save what was typed in the day editor. Returns one entry per line ({ item }) for the detail button.
+  const saveEditor = async (date, lines) => {
+    const originals = sortDay(byDay.get(date) || [], s.doneToBottom).filter((i) => !i.part || i.part[0] === 1);
+    const byKey = new Map(originals.map((i) => [i.key, i]));
     const kept = new Set();
-    let changed = false;
+    const entries = [];
     const ops = [];
-    for (const row of rows) {
-      const text = row.text.trim();
-      if (row.item) {
-        kept.add(row.item.key);
-        if (!text) { ops.push(deleteOccurrence(row.item, 'occurrence')); changed = true; } else if (text !== row.item.title) { ops.push(updateEvent(row.item._id, { title: text })); changed = true; }
-      }
-    }
-    for (const it of originals) {
-      if (!kept.has(it.key)) { ops.push(deleteOccurrence(it, 'occurrence')); changed = true; }
-    }
-    const maxOrder = Math.max(-1, ...originals.map((i) => i.order ?? 0));
-    let n = 0;
-    for (const row of rows) {
-      if (!row.item && row.text.trim()) {
-        ops.push(createEvent({ date, title: row.text.trim(), order: maxOrder + 1 + n++ }));
+    let changed = false;
+    lines.forEach((line, idx) => {
+      const orig = line.key && byKey.get(line.key);
+      if (!orig) {
         changed = true;
+        entries[idx] = createEvent({ date, title: line.text, html: line.html, done: line.done }).then((created) => created && { item: { ...created, occ: created.date } });
+        return;
       }
+      kept.add(orig.key);
+      entries[idx] = Promise.resolve({ item: orig });
+      const patch = {};
+      if (line.text !== orig.title || line.html !== (orig.html || escapeHtml(orig.title))) {
+        patch.title = line.text;
+        patch.html = line.html;
+      }
+      if (line.done !== Boolean(orig.done)) {
+        if (orig.rrule) {
+          const set = new Set(orig.doneDates || []);
+          if (line.done) set.add(orig.occ); else set.delete(orig.occ);
+          patch.doneDates = [...set];
+        } else {
+          patch.done = line.done;
+        }
+      }
+      if (Object.keys(patch).length) { changed = true; ops.push(updateEvent(orig._id, patch)); }
+    });
+    for (const it of originals) {
+      if (!kept.has(it.key)) { changed = true; ops.push(deleteOccurrence(it, 'occurrence')); }
+    }
+    const resolved = await Promise.all(entries);
+    await Promise.all(ops);
+    // Keep the typed line order (repeating items keep their own order).
+    const ids = resolved.map((e) => e?.item).filter((it) => it && !it.rrule).map((it) => it._id);
+    const before = originals.filter((it) => !it.rrule).map((it) => it._id);
+    if (ids.length && ids.join() !== before.join()) {
+      setEvents((l) => l.map((e) => (ids.includes(e._id) ? { ...e, order: ids.indexOf(e._id) } : e)));
+      await run(api.reorder(ids));
     }
     if (changed) playSound(s.editSound);
-    await Promise.all(ops);
+    return resolved;
+  };
+
+  const setDayBg = useCallback((date, bg) => {
+    data.setDays((d) => ({ ...d, [date]: bg }));
+    run(api.setDayBg(date, bg));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s.editSound]);
+  }, []);
 
   const dropItem = useCallback((id, from, to) => {
     const ev = events.find((e) => e._id === id);
@@ -138,20 +167,22 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events, s.editSound]);
 
-  const openItem = useCallback((item) => setDialog({ type: 'event', item }), []);
-  const startEdit = useCallback((date) => {
-    if (compact) setDialog({ type: 'day', date });
-    else setEditingDate(date);
-  }, [compact]);
+  const openEditor = useCallback((date, rect) => setEditor({ date, rect }), []);
 
   const handlers = useMemo(() => ({
-    onStartEdit: startEdit,
-    onCommit: commitCell,
-    onCancelEdit: () => setEditingDate(null),
+    onOpenEditor: openEditor,
     onToggle: toggleDone,
-    onOpen: openItem,
     onDropItem: dropItem,
-  }), [startEdit, commitCell, toggleDone, openItem, dropItem]);
+  }), [openEditor, toggleDone, dropItem]);
+
+  // ---------- 접기 / 펼치기 ----------
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed((c) => {
+      try { localStorage.setItem('collapsed', c ? '0' : '1'); } catch { /* ignore */ }
+      return !c;
+    });
+  }, []);
+  useEffect(() => { if (me && isDesktop) desktop.setCollapsed?.(collapsed); }, [me, collapsed]);
 
   // ---------- notes & countdowns ----------
   const noteActions = {
@@ -230,6 +261,13 @@ export default function App() {
 
   if (me === undefined) return <div className="boot">불러오는 중…</div>;
   if (me === null) return <LoginScreen onLoggedIn={data.loadMe} />;
+  if (collapsed) {
+    return (
+      <div className={`collapsed-chip ${isDesktop ? 'is-desktop' : ''}`} onDoubleClick={toggleCollapsed} title="더블클릭하면 펼쳐집니다" role="button" aria-label="캘린더 펼치기">
+        <span className="app-mark" />
+      </div>
+    );
+  }
 
   const alpha = (100 - s.opacity) / 100;
   const style = {
@@ -254,6 +292,7 @@ export default function App() {
     newNote: noteActions.create,
     newCountdown: countdownActions.create,
     toggleNotes: () => updateSettings({ showNotes: !s.showNotes }),
+    collapse: toggleCollapsed,
     openMobile: () => setDialog({ type: 'mobile' }),
     openAccount: () => setDialog({ type: 'account' }),
     openSearch: () => setDialog({ type: 'search' }),
@@ -276,7 +315,7 @@ export default function App() {
       <Toolbar s={s} today={today} anchor={anchorRaw ?? anchorFor(s, today)} actions={actions} />
       <CalendarView
         grid={realGrid} s={s} today={today} anchor={anchorRaw ?? anchorFor(s, today)} byDay={byDay}
-        editingDate={editingDate} highlightDate={highlight} compact={compact} handlers={handlers}
+        days={data.days} editingDate={editor?.date} highlightDate={highlight} compact={compact} handlers={handlers}
       />
       {!data.online && <div className="offline">서버에 연결할 수 없습니다. 다시 연결 중…</div>}
       {s.showNotes && !isDesktop && !compact && (
@@ -286,27 +325,38 @@ export default function App() {
         <button className="fab" onClick={actions.openCards} aria-label="메모와 D-day"><Icon name="note" /></button>
       )}
 
+      {editor && (
+        <DayEditor
+          key={editor.date}
+          date={editor.date}
+          items={sortDay(byDay.get(editor.date) || [], s.doneToBottom).filter((i) => !i.part || i.part[0] === 1)}
+          s={s}
+          anchorRect={editor.rect}
+          dayBg={data.days[editor.date] || ''}
+          compact={compact}
+          onSave={(lines) => saveEditor(editor.date, lines)}
+          onClose={() => setEditor(null)}
+          onSetBg={(bg) => setDayBg(editor.date, bg)}
+          onCycleList={() => updateSettings({ listStyle: { bullet: 'number', number: 'none', none: 'bullet' }[s.listStyle] || 'bullet' })}
+          onOpenDetail={(entry) => {
+            const date = editor.date;
+            setEditor(null);
+            setDialog({ type: 'event', item: entry?.item || { date } });
+          }}
+        />
+      )}
       {dialog?.type === 'event' && (
         <EventDialog
           item={dialog.item}
           onClose={() => setDialog(null)}
           onSave={(patch) => {
+            // A plain-text title edit replaces the formatted text.
+            if (patch.title !== dialog.item.title) patch.html = '';
             if (dialog.item._id) updateEvent(dialog.item._id, patch); else createEvent(patch);
             playSound(s.editSound);
             setDialog(null);
           }}
           onDelete={(scope) => { deleteOccurrence(dialog.item, scope); setDialog(null); }}
-        />
-      )}
-      {dialog?.type === 'day' && (
-        <DaySheet
-          date={dialog.date} s={s}
-          items={sortDay(byDay.get(dialog.date) || [], s.doneToBottom)}
-          onClose={() => setDialog(null)}
-          onAdd={(title) => createEvent({ date: dialog.date, title })}
-          onToggle={toggleDone}
-          onOpen={openItem}
-          onNew={() => setDialog({ type: 'event', item: { date: dialog.date } })}
         />
       )}
       {dialog?.type === 'settings' && (

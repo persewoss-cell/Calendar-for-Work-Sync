@@ -20,7 +20,7 @@ function dayInfo(date, s) {
   return { holidays, solarTerm, lunar };
 }
 
-export function CalendarView({ grid, s, today, anchor, byDay, editingDate, highlightDate, compact, handlers }) {
+export function CalendarView({ grid, s, today, anchor, byDay, days = {}, editingDate, highlightDate, compact, handlers }) {
   const names = s.language === 'en' ? (compact ? WEEKDAYS.enShort : WEEKDAYS.en) : (compact ? WEEKDAYS.koShort : WEEKDAYS.ko);
   const anchorMonth = anchor.slice(0, 7);
   const showWeekCol = s.weekNumbers;
@@ -63,6 +63,7 @@ export function CalendarView({ grid, s, today, anchor, byDay, editingDate, highl
                 items={sortDay(byDay.get(date) || [], s.doneToBottom)}
                 editing={editingDate === date}
                 highlight={highlightDate === date}
+                dayBg={days[date] || ''}
                 compact={compact}
                 {...handlers}
               />

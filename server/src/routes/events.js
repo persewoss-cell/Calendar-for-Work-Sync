@@ -2,6 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import { EDITABLE_EVENT_FIELDS, Event } from '../models/Event.js';
 import { notify } from '../lib/realtime.js';
+import { htmlToText, sanitizeHtml } from '../../../shared/sanitize.js';
 
 export const eventsRouter = Router();
 
@@ -10,6 +11,10 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 function pick(body) {
   const out = {};
   for (const k of EDITABLE_EVENT_FIELDS) if (k in body) out[k] = body[k];
+  if ('html' in out) {
+    out.html = sanitizeHtml(out.html, 5000);
+    if (!('title' in out)) out.title = htmlToText(out.html);
+  }
   if ('title' in out) out.title = String(out.title).slice(0, 500);
   if ('memo' in out) out.memo = String(out.memo).slice(0, 10000);
   return out;

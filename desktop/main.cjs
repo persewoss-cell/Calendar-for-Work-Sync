@@ -1,5 +1,5 @@
 const {
-  app, BrowserWindow, Tray, Menu, ipcMain, shell, globalShortcut, screen, nativeImage, net, dialog,
+  app, BrowserWindow, Tray, Menu, ipcMain, shell, globalShortcut, screen, nativeImage, net, dialog, session,
 } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -27,6 +27,8 @@ let mainWin = null;
 let setupWin = null;
 let tray = null;
 let moveMode = false;
+let collapsed = false;
+const CHIP = 48; // collapsed window size (px)
 let quitting = false;
 let lastSettings = {};
 const cardWins = new Map(); // key "note:<id>" | "countdown:<id>" → BrowserWindow
@@ -86,7 +88,11 @@ function createMainWindow() {
   lockNavigation(mainWin);
   mainWin.loadURL(`${config.serverUrl}/`);
   mainWin.once('ready-to-show', () => mainWin.showInactive());
-  const remember = () => { config.bounds = mainWin.getBounds(); saveConfig(); };
+  const remember = () => {
+    if (collapsed) return; // keep the expanded size
+    config.bounds = mainWin.getBounds();
+    saveConfig();
+  };
   mainWin.on('moved', remember);
   mainWin.on('resized', remember);
   mainWin.on('close', (e) => {
@@ -164,7 +170,23 @@ function setVisible(visible) {
   updateTray();
 }
 
+/** 접기: shrink the calendar to a small square at its top-left corner (and back). */
+function setCollapsed(on) {
+  if (!mainWin || collapsed === on) return;
+  if (on && moveMode) setMoveMode(false);
+  const expanded = config.bounds || mainWin.getBounds();
+  collapsed = on;
+  if (on) {
+    config.bounds = mainWin.getBounds();
+    saveConfig();
+    mainWin.setBounds({ x: expanded.x, y: expanded.y, width: CHIP, height: CHIP });
+  } else {
+    mainWin.setBounds(config.bounds || defaultBounds());
+  }
+}
+
 function setMoveMode(on) {
+  if (on && collapsed) return;
   moveMode = on;
   if (!mainWin) return;
   mainWin.setResizable(on);
@@ -309,6 +331,7 @@ ipcMain.on('change-server', openSetup);
 ipcMain.on('quit', () => { quitting = true; app.quit(); });
 ipcMain.on('hide', () => setVisible(false));
 ipcMain.on('toggle-move', () => setMoveMode(!moveMode));
+ipcMain.on('set-collapsed', (_e, on) => setCollapsed(Boolean(on)));
 ipcMain.on('apply-settings', (_e, s) => applySettings(s));
 ipcMain.on('sync-cards', (_e, cards) => syncCards(cards));
 ipcMain.handle('save-server', async (_e, url) => {
@@ -333,7 +356,9 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', () => setVisible(true));
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    // The desktop app always loads the live server; drop any service worker left from older versions.
+    await session.defaultSession.clearStorageData({ storages: ['serviceworkers', 'cachestorage'] }).catch(() => {});
     loadConfig();
     createTray();
     if (config.serverUrl) createMainWindow();

@@ -2,12 +2,15 @@
   "name": "calendar-for-work-sync",
   "private": true,
   "version": "1.0.0",
-  "workspaces": ["server", "web"],
+  "workspaces": [
+    "server",
+    "web"
+  ],
   "scripts": {
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",
     "build": "npm run build -w web",
     "start": "npm start -w server",
-    "test": "npm test -w web && npm test -w server"
+    "test": "npm test -w web && npm test -w server && node --test shared/*.test.js"
   }
 }

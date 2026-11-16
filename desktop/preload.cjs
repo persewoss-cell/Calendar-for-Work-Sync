@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('workcalDesktop', {
   quit: () => ipcRenderer.send('quit'),
   hide: () => ipcRenderer.send('hide'),
   toggleMoveResize: () => ipcRenderer.send('toggle-move'),
+  setCollapsed: (on) => ipcRenderer.send('set-collapsed', Boolean(on)),
   applySettings: (settings) => ipcRenderer.send('apply-settings', JSON.parse(JSON.stringify(settings))),
   syncCards: (cards) => ipcRenderer.send('sync-cards', cards),
   onShortcut: (cb) => {

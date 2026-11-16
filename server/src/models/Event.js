@@ -6,7 +6,8 @@ const TIME = /^\d{2}:\d{2}$/;
 const eventSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true, required: true },
-    title: { type: String, default: '' },
+    title: { type: String, default: '' }, // plain text (search, export)
+    html: { type: String, default: '' }, // sanitized inline formatting of the title
     memo: { type: String, default: '' },
     date: { type: String, match: DATE, required: true }, // start date in the user's timezone
     endDate: { type: String, match: DATE }, // inclusive; equals date for single-day events
@@ -39,6 +40,6 @@ eventSchema.pre('validate', function (next) {
 export const Event = mongoose.model('Event', eventSchema);
 
 export const EDITABLE_EVENT_FIELDS = [
-  'title', 'memo', 'date', 'endDate', 'startTime', 'endTime', 'color', 'done', 'doneDates',
+  'title', 'html', 'memo', 'date', 'endDate', 'startTime', 'endTime', 'color', 'done', 'doneDates',
   'order', 'reminder', 'rrule', 'exdates',
 ];

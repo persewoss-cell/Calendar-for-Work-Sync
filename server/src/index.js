@@ -13,6 +13,7 @@ import { authRouter } from './routes/auth.js';
 import { eventsRouter } from './routes/events.js';
 import { accountRouter } from './routes/account.js';
 import { crudRouter } from './routes/crud.js';
+import { daysRouter } from './routes/days.js';
 import { Note } from './models/Note.js';
 import { Countdown } from './models/Countdown.js';
 
@@ -27,6 +28,7 @@ export function createApp() {
   app.use('/api', requireAuth);
   app.use('/api', accountRouter);
   app.use('/api/events', eventsRouter);
+  app.use('/api/days', daysRouter);
   app.use('/api/notes', crudRouter(Note, 'notes', ['title', 'items', 'color', 'visible', 'order']));
   app.use('/api/countdowns', crudRouter(Countdown, 'countdowns', ['title', 'date', 'repeatYearly', 'color', 'visible']));
 

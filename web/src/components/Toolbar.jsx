@@ -44,8 +44,12 @@ export function Toolbar({ s, today, anchor, actions }) {
   const color = s.titleButtonColor;
 
   return (
-    <header className={`toolbar ${s.showTitleBar ? '' : 'autohide'}`}>
+    <header className={`toolbar ${s.showTitleBar ? '' : 'autohide'}`} title="제목 줄을 더블클릭하면 접힙니다"
+      onDoubleClick={(e) => { if (!e.target.closest('button, .menu')) actions.collapse(); }}>
       <div className="tb-left">
+        <button className="icon-btn" style={{ color: s.titleButtonColor }} title="접기 (제목 줄 더블클릭)" aria-label="캘린더 접기" onClick={actions.collapse}>
+          <Icon name="collapse" size={16} />
+        </button>
         {s.viewStyle === 'month' && (
           <button className={`month-chip ${away ? 'away' : ''}`} onClick={actions.goToday} title="오늘로 이동">
             {ay}년 {am}월{away && <small> · 오늘로</small>}

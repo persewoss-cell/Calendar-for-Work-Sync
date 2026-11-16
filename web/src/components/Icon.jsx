@@ -34,6 +34,11 @@ const PATHS = {
   eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   pin: 'M9 4h6l-1 6 4 4H6l4-4zM12 14v7',
   logout: 'M15 4h4v16h-4M10 8l-4 4 4 4M6 12h11',
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
+  checkSquare: 'M4 4h16v16H4zM8 12l3 3 5-6',
+  list: 'M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01',
+  clearFormat: 'M4 7V5h11v2M9.5 5l-3 14M14 14l6 6M20 14l-6 6',
+  collapse: 'M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7',
 };
 
 export function Icon({ name, size = 18, stroke = 1.8, className = '', title }) {

@@ -34,6 +34,9 @@ export const api = {
   reorder: (ids) => request('POST', '/api/events/reorder', { ids }),
   rollover: (today) => request('POST', '/api/events/rollover', { today }),
 
+  days: (from, to) => request('GET', `/api/days?from=${from}&to=${to}`),
+  setDayBg: (date, bg) => request('PUT', `/api/days/${date}`, { bg }),
+
   notes: () => request('GET', '/api/notes'),
   createNote: (n) => request('POST', '/api/notes', n),
   updateNote: (id, n) => request('PATCH', `/api/notes/${id}`, n),

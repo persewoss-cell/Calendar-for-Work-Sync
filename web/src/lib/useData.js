@@ -8,6 +8,7 @@ export function useData(range) {
   const [me, setMe] = useState(undefined); // undefined = loading, null = signed out
   const [settings, setSettings] = useState(mergeSettings());
   const [events, setEvents] = useState([]);
+  const [days, setDays] = useState({}); // date → cell background color
   const [notes, setNotes] = useState([]);
   const [countdowns, setCountdowns] = useState([]);
   const [online, setOnline] = useState(true);
@@ -23,6 +24,13 @@ export function useData(range) {
     } catch (e) {
       if (e.status === 401) setMe(null);
     }
+  }, []);
+  const loadDays = useCallback(async () => {
+    const { from, to } = rangeRef.current;
+    try {
+      const list = await api.days(from, to);
+      setDays(Object.fromEntries(list.map((d) => [d.date, d.bg])));
+    } catch { /* ignore */ }
   }, []);
   const loadNotes = useCallback(() => api.notes().then(setNotes).catch(() => {}), []);
   const loadCountdowns = useCallback(() => api.countdowns().then(setCountdowns).catch(() => {}), []);
@@ -40,7 +48,7 @@ export function useData(range) {
   }, []);
 
   useEffect(() => { loadMe(); }, [loadMe]);
-  useEffect(() => { if (me) loadEvents(); }, [me, range.from, range.to, loadEvents]);
+  useEffect(() => { if (me) { loadEvents(); loadDays(); } }, [me, range.from, range.to, loadEvents, loadDays]);
   useEffect(() => { if (me) { loadNotes(); loadCountdowns(); } }, [me, loadNotes, loadCountdowns]);
 
   useEffect(() => {
@@ -52,6 +60,7 @@ export function useData(range) {
     socket.on('disconnect', () => setOnline(false));
     socket.on('changed', ({ kind }) => {
       if (kind === 'events') debounce('events', loadEvents);
+      if (kind === 'days') debounce('days', loadDays);
       if (kind === 'notes') debounce('notes', loadNotes);
       if (kind === 'countdowns') debounce('countdowns', loadCountdowns);
       if (kind === 'settings') debounce('settings', loadMe);
@@ -62,7 +71,7 @@ export function useData(range) {
       socket.close();
       window.removeEventListener('focus', onFocus);
     };
-  }, [me, loadEvents, loadNotes, loadCountdowns, loadMe]);
+  }, [me, loadEvents, loadDays, loadNotes, loadCountdowns, loadMe]);
 
   const updateSettings = useCallback((patch) => {
     setSettings((cur) => mergeSettings({ ...cur, ...patch }));
@@ -76,7 +85,7 @@ export function useData(range) {
   }, []);
 
   return {
-    me, setMe, loadMe, settings, updateSettings, events, setEvents, loadEvents,
+    me, setMe, loadMe, settings, updateSettings, events, setEvents, loadEvents, days, setDays,
     notes, setNotes, loadNotes, countdowns, setCountdowns, loadCountdowns,
     online,
   };
