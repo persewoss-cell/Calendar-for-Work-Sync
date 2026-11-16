@@ -51,7 +51,6 @@ export function DateDialog({ value, onPick, onClose }) {
 
 export function ExportDialog({ mode, s, onClose, onImported }) {
   const [status, setStatus] = useState('');
-  const [toGoogle, setToGoogle] = useState(false);
   const fileRef = useRef(null);
   const stamp = todayIn(s.timezone);
 
@@ -84,7 +83,7 @@ export function ExportDialog({ mode, s, onClose, onImported }) {
         for (const c of data.countdowns || []) await api.createCountdown({ title: c.title, date: c.date, repeatYearly: c.repeatYearly, color: c.color });
         extra = `, 메모 ${(data.notes || []).length}개, D-day ${(data.countdowns || []).length}개`;
       }
-      const cleaned = events.map(({ _id, userId, googleEventId, googleEtag, syncState, createdAt, updatedAt, ...e }) => ({ ...e, googleSync: toGoogle }));
+      const cleaned = events.map(({ _id, userId, createdAt, updatedAt, ...e }) => e);
       const r = await api.bulkCreate(cleaned);
       setStatus(`일정 ${r.created}개${extra}를 불러왔습니다.`);
       onImported?.();
@@ -98,13 +97,12 @@ export function ExportDialog({ mode, s, onClose, onImported }) {
       {mode === 'export' ? (
         <div className="export-grid">
           <button className="big-btn" onClick={() => doExport('json')}><Icon name="download" /> 전체 백업 (JSON)<small>일정·메모·D-day·설정</small></button>
-          <button className="big-btn" onClick={() => doExport('ics')}><Icon name="calendar" /> iCalendar (.ics)<small>구글/아웃룩에서 열기</small></button>
+          <button className="big-btn" onClick={() => doExport('ics')}><Icon name="calendar" /> iCalendar (.ics)<small>다른 캘린더 앱(구글·아웃룩 등)에서 열기</small></button>
           <button className="big-btn" onClick={() => doExport('csv')}><Icon name="note" /> 엑셀용 (CSV)</button>
         </div>
       ) : (
         <div className="form">
           <p className="muted">백업 파일(.json) 또는 iCalendar 파일(.ics)을 고르세요. 기존 일정은 그대로 두고 추가됩니다.</p>
-          <label className="check"><input type="checkbox" checked={toGoogle} onChange={(e) => setToGoogle(e.target.checked)} /> 불러온 일정을 구글 캘린더에도 반영</label>
           <input ref={fileRef} type="file" accept=".json,.ics" hidden onChange={(e) => e.target.files[0] && doImport(e.target.files[0])} />
           <button className="big-btn" onClick={() => fileRef.current.click()}><Icon name="upload" /> 파일 선택</button>
         </div>
@@ -123,7 +121,7 @@ export function MobileDialog({ onClose }) {
       <div className="mobile-connect">
         {qr && <img src={qr} alt="모바일 접속 QR 코드" width="180" height="180" />}
         <div>
-          <p>휴대폰 카메라로 QR 코드를 찍고, <b>같은 구글 계정</b>으로 로그인하세요. PC와 모바일이 실시간으로 동기화됩니다.</p>
+          <p>휴대폰 카메라로 QR 코드를 찍고, <b>같은 아이디</b>로 로그인하세요. PC와 모바일이 실시간으로 동기화됩니다.</p>
           <p className="muted mono">{url}</p>
           <h4>앱처럼 설치하기</h4>
           <ul>
@@ -139,14 +137,13 @@ export function MobileDialog({ onClose }) {
 export function HelpDialog({ onClose }) {
   const items = [
     ['셀 클릭 → 바로 입력', '날짜 칸을 누르면 그 자리에서 할 일을 적습니다. Enter로 줄을 추가하고 Esc나 바깥을 누르면 저장됩니다. 빈 줄로 지우면 삭제됩니다.'],
-    ['일정 상세', '일정 글자를 누르거나 두 번 누르면 시간, 여러 날, 반복, 색상, 알림, 메모, 구글 반영을 설정할 수 있습니다.'],
-    ['구글 캘린더 반영 켜기/끄기', '일정마다 「구글 캘린더에 반영」 스위치가 있습니다. 끄면 구글에서만 지워지고 이 앱에는 남습니다. 구글에서 만든 일정도 가져옵니다.'],
+    ['일정 상세', '일정 글자를 누르거나 두 번 누르면 시간, 여러 날, 반복, 색상, 알림, 메모를 설정할 수 있습니다.'],
     ['끌어서 옮기기', '일정을 다른 날짜로 끌어 놓으면 날짜가 바뀝니다.'],
     ['체크박스·완료', '체크하면 완료 처리되고 설정에 따라 맨 아래로 내려갑니다. 미완료 자동 연기도 켤 수 있습니다.'],
     ['공휴일·24절기·음력', '대한민국 공휴일과 대체공휴일, 24절기, 음력 날짜를 표시합니다.'],
     ['스티커 메모·D-day 카드', '퍼즐 아이콘에서 메모와 D-day 카드를 만듭니다. PC 앱에서는 바탕화면에 따로 붙습니다.'],
     ['알림', '알림을 설정한 일정은 시간이 되면 알림창과 소리로 알려줍니다.'],
-    ['PC ↔ 모바일 동기화', '같은 계정으로 로그인한 모든 기기에 즉시 반영됩니다.'],
+    ['PC ↔ 모바일 동기화', '같은 아이디로 로그인한 모든 기기에 즉시 반영됩니다.'],
     ['내보내기·불러오기·프린트', '메뉴에서 백업(JSON), iCalendar, CSV로 내보내고 불러오거나 인쇄할 수 있습니다.'],
   ];
   return (

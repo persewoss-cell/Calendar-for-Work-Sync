@@ -3,6 +3,7 @@ services:
     name: workcal
     runtime: node
     plan: free
+    region: singapore
     buildCommand: npm ci && npm run build
     startCommand: npm start
     healthCheckPath: /healthz
@@ -17,7 +18,5 @@ services:
         generateValue: true
       - key: PUBLIC_URL
         sync: false
-      - key: GOOGLE_CLIENT_ID
-        sync: false
-      - key: GOOGLE_CLIENT_SECRET
-        sync: false
+      - key: ALLOW_SIGNUP
+        value: "true"

@@ -52,7 +52,7 @@ export default function App() {
     return { from: g.from, to: g.to };
   });
   const data = useData(range);
-  const { me, settings: s, updateSettings, events, setEvents, google } = data;
+  const { me, settings: s, updateSettings, events, setEvents } = data;
 
   useEffect(() => { setTz(s.timezone); }, [s.timezone]);
   useEffect(() => { setAnchor(null); }, [s.viewStyle]);
@@ -66,7 +66,6 @@ export default function App() {
   const [editingDate, setEditingDate] = useState(null);
   const [dialog, setDialog] = useState(null); // { type, ...props }
   const [highlight, setHighlight] = useState(null);
-  const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState('');
   const [toasts, dismissToast] = useReminders(Boolean(me), s, events.length);
 
@@ -223,20 +222,6 @@ export default function App() {
     setDialog(null);
   };
 
-  const cloud = async () => {
-    if (!google.enabled) return setDialog({ type: 'account' });
-    setSyncing(true);
-    try {
-      const r = await api.googleSync();
-      flash(r.error ? `동기화 실패: ${r.error}` : '구글 캘린더와 동기화했습니다.');
-      data.refreshGoogle();
-    } catch (e) {
-      flash(e.message);
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const logout = async () => {
     await api.logout().catch(() => {});
     data.setMe(null);
@@ -244,9 +229,8 @@ export default function App() {
   };
 
   if (me === undefined) return <div className="boot">불러오는 중…</div>;
-  if (me === null) return <LoginScreen />;
+  if (me === null) return <LoginScreen onLoggedIn={data.loadMe} />;
 
-  const visibleEvents = [...byDay.values()].flat();
   const alpha = (100 - s.opacity) / 100;
   const style = {
     '--font': fontCss(s.fontFamily),
@@ -271,7 +255,6 @@ export default function App() {
     newCountdown: countdownActions.create,
     toggleNotes: () => updateSettings({ showNotes: !s.showNotes }),
     openMobile: () => setDialog({ type: 'mobile' }),
-    cloud,
     openAccount: () => setDialog({ type: 'account' }),
     openSearch: () => setDialog({ type: 'search' }),
     openDate: () => setDialog({ type: 'date' }),
@@ -290,7 +273,7 @@ export default function App() {
 
   return (
     <div className={classes} style={style}>
-      <Toolbar s={s} today={today} anchor={anchorRaw ?? anchorFor(s, today)} google={google} syncing={syncing} actions={actions} />
+      <Toolbar s={s} today={today} anchor={anchorRaw ?? anchorFor(s, today)} actions={actions} />
       <CalendarView
         grid={realGrid} s={s} today={today} anchor={anchorRaw ?? anchorFor(s, today)} byDay={byDay}
         editingDate={editingDate} highlightDate={highlight} compact={compact} handlers={handlers}
@@ -306,7 +289,6 @@ export default function App() {
       {dialog?.type === 'event' && (
         <EventDialog
           item={dialog.item}
-          google={google}
           onClose={() => setDialog(null)}
           onSave={(patch) => {
             if (dialog.item._id) updateEvent(dialog.item._id, patch); else createEvent(patch);
@@ -331,7 +313,7 @@ export default function App() {
         <SettingsDialog s={s} update={updateSettings} initialTab={dialog.tab} onClose={() => setDialog(null)} onOpenHelp={() => setDialog({ type: 'help' })} />
       )}
       {dialog?.type === 'account' && (
-        <AccountDialog me={me} google={google} refreshGoogle={data.refreshGoogle} onLogout={logout} onClose={() => setDialog(null)} visibleEvents={visibleEvents} />
+        <AccountDialog me={me} onSaved={data.loadMe} onLogout={logout} onClose={() => setDialog(null)} />
       )}
       {dialog?.type === 'search' && <SearchDialog onPick={goTo} onClose={() => setDialog(null)} />}
       {dialog?.type === 'date' && <DateDialog value={today} onPick={goTo} onClose={() => setDialog(null)} />}

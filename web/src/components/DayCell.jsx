@@ -1,5 +1,5 @@
 import { memo, useState } from 'react';
-import { GoogleMark, Icon } from './Icon.jsx';
+import { Icon } from './Icon.jsx';
 import { LineEditor } from './LineEditor.jsx';
 import { hexToRgba } from '../lib/settings.js';
 
@@ -10,7 +10,7 @@ function ItemRow({ item, index, s, onToggle, onOpen, onDragStart }) {
   const textBg = s.textBackground === 'light' ? 'rgba(255,255,255,.22)' : s.textBackground === 'dark' ? 'rgba(0,0,0,.25)' : '';
   return (
     <li
-      className={`item ${item.done ? 'done' : ''} ${item.syncState === 'error' ? 'sync-error' : ''}`}
+      className={`item ${item.done ? 'done' : ''}`}
       draggable={!item.rrule}
       onDragStart={(e) => onDragStart(e, item)}
       onDoubleClick={(e) => { e.stopPropagation(); onOpen(item); }}
@@ -32,7 +32,6 @@ function ItemRow({ item, index, s, onToggle, onOpen, onDragStart }) {
         <span className="item-reminder" title={`알림: ${REMINDER_LABEL(item.reminder)}`}><Icon name="bell" size={10} /></span>
       )}
       {item.rrule && <Icon name="repeat" size={10} className="item-flag" />}
-      {item.googleSync && <span className="item-flag g" title={item.syncState === 'error' ? `구글 반영 실패: ${item.syncError}` : '구글 캘린더에 반영됨'}><GoogleMark size={9} /></span>}
     </li>
   );
 }

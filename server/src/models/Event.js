@@ -20,14 +20,7 @@ const eventSchema = new mongoose.Schema(
     rrule: { type: String, default: '' }, // e.g. FREQ=WEEKLY;BYDAY=TU (no DTSTART)
     exdates: { type: [String], default: [] },
 
-    // Google Calendar sync — "반영" toggle per event
-    googleSync: { type: Boolean, default: false },
-    googleEventId: { type: String, index: true },
-    googleCalendarId: String,
-    googleEtag: String,
-    syncState: { type: String, enum: ['none', 'pending', 'synced', 'error'], default: 'none' },
-    syncError: String,
-    source: { type: String, enum: ['local', 'google', 'import'], default: 'local' },
+    source: { type: String, enum: ['local', 'import'], default: 'local' },
 
     deleted: { type: Boolean, default: false, index: true },
     deletedAt: Date,
@@ -47,5 +40,5 @@ export const Event = mongoose.model('Event', eventSchema);
 
 export const EDITABLE_EVENT_FIELDS = [
   'title', 'memo', 'date', 'endDate', 'startTime', 'endTime', 'color', 'done', 'doneDates',
-  'order', 'reminder', 'rrule', 'exdates', 'googleSync',
+  'order', 'reminder', 'rrule', 'exdates',
 ];

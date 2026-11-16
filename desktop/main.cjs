@@ -4,7 +4,6 @@ const {
 const path = require('node:path');
 const fs = require('node:fs');
 
-const PROTOCOL = 'workcal';
 const ICON = path.join(__dirname, 'build', 'icon.png');
 
 // ---------- small JSON config in the user data folder ----------
@@ -227,18 +226,7 @@ function applySettings(s) {
   }
 }
 
-// ---------- login hand-off (system browser → workcal://auth?code=…) ----------
-function handleProtocolUrl(url) {
-  if (!url?.startsWith(`${PROTOCOL}://`)) return;
-  const code = new URL(url).searchParams.get('code');
-  if (code && mainWin) {
-    mainWin.loadURL(`${config.serverUrl}/auth/complete?code=${encodeURIComponent(code)}`);
-    mainWin.showInactive();
-  }
-}
-
 // ---------- ipc ----------
-ipcMain.on('login', () => shell.openExternal(`${config.serverUrl}/auth/google?client=desktop`));
 ipcMain.on('change-server', openSetup);
 ipcMain.on('quit', () => { quitting = true; app.quit(); });
 ipcMain.on('hide', () => setVisible(false));
@@ -262,29 +250,16 @@ ipcMain.handle('save-server', async (_e, url) => {
 });
 
 // ---------- app lifecycle ----------
-if (process.defaultApp && process.argv.length >= 2) {
-  app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [path.resolve(process.argv[1])]);
-} else {
-  app.setAsDefaultProtocolClient(PROTOCOL);
-}
-
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', (_e, argv) => {
-    const url = argv.find((a) => a.startsWith(`${PROTOCOL}://`));
-    if (url) handleProtocolUrl(url);
-    else setVisible(true);
-  });
-  app.on('open-url', (e, url) => { e.preventDefault(); handleProtocolUrl(url); });
+  app.on('second-instance', () => setVisible(true));
 
   app.whenReady().then(() => {
     loadConfig();
     createTray();
     if (config.serverUrl) createMainWindow();
     else openSetup();
-    const startUrl = process.argv.find((a) => a.startsWith(`${PROTOCOL}://`));
-    if (startUrl) setTimeout(() => handleProtocolUrl(startUrl), 1500);
   });
   app.on('window-all-closed', (e) => e.preventDefault?.());
   app.on('before-quit', () => { quitting = true; });

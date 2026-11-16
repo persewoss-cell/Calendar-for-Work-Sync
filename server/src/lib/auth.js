@@ -6,12 +6,9 @@ import { User } from '../models/User.js';
 export const COOKIE = 'wc_token';
 const MAX_AGE_DAYS = 180;
 
-export function signToken(userId) {
-  return jwt.sign({ sub: String(userId) }, config.jwtSecret, { expiresIn: `${MAX_AGE_DAYS}d` });
-}
-
 export function setAuthCookie(res, userId) {
-  res.cookie(COOKIE, signToken(userId), {
+  const token = jwt.sign({ sub: String(userId) }, config.jwtSecret, { expiresIn: `${MAX_AGE_DAYS}d` });
+  res.cookie(COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
     secure: config.publicUrl.startsWith('https://'),
@@ -21,11 +18,8 @@ export function setAuthCookie(res, userId) {
 }
 
 export function tokenFromRequest(req) {
-  const header = req.headers.authorization || '';
-  if (header.startsWith('Bearer ')) return header.slice(7);
   if (req.cookies?.[COOKIE]) return req.cookies[COOKIE];
-  const cookies = parseCookie(req.headers.cookie || '');
-  return cookies[COOKIE];
+  return parseCookie(req.headers.cookie || '')[COOKIE];
 }
 
 export function userIdFromToken(token) {
@@ -39,23 +33,25 @@ export function userIdFromToken(token) {
 
 export async function requireAuth(req, res, next) {
   const id = userIdFromToken(tokenFromRequest(req));
-  if (!id) return res.status(401).json({ error: 'unauthorized' });
-  const user = await User.findById(id);
+  const user = id ? await User.findById(id) : null;
   if (!user) return res.status(401).json({ error: 'unauthorized' });
   req.user = user;
   next();
 }
 
-// Short-lived one-time codes hand a login from the system browser to the desktop app.
-const oneTime = new Map();
-export function issueOneTimeCode(userId) {
-  const code = crypto.randomUUID();
-  oneTime.set(code, { userId: String(userId), exp: Date.now() + 5 * 60 * 1000 });
-  return code;
+// Brute-force guard: at most 10 failed logins per username+IP every 15 minutes.
+const failures = new Map();
+const WINDOW = 15 * 60 * 1000;
+
+export function loginBlocked(key) {
+  const f = failures.get(key);
+  return Boolean(f && Date.now() - f.first < WINDOW && f.count >= 10);
 }
-export function consumeOneTimeCode(code) {
-  const entry = oneTime.get(code);
-  oneTime.delete(code);
-  if (!entry || entry.exp < Date.now()) return null;
-  return entry.userId;
+
+export function recordFailure(key) {
+  const f = failures.get(key);
+  if (!f || Date.now() - f.first > WINDOW) failures.set(key, { first: Date.now(), count: 1 });
+  else f.count++;
 }
+
+export const clearFailures = (key) => failures.delete(key);

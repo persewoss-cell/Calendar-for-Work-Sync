@@ -6,10 +6,9 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import mongoose from 'mongoose';
 import { Server } from 'socket.io';
-import { config, googleConfigured } from './config.js';
+import { config } from './config.js';
 import { requireAuth, tokenFromRequest, userIdFromToken } from './lib/auth.js';
 import { setIo } from './lib/realtime.js';
-import { startScheduler } from './lib/googleSync.js';
 import { authRouter } from './routes/auth.js';
 import { eventsRouter } from './routes/events.js';
 import { accountRouter } from './routes/account.js';
@@ -61,9 +60,8 @@ export async function start() {
   });
   io.on('connection', (socket) => socket.join(`user:${socket.data.userId}`));
   setIo(io);
-  startScheduler(config.syncIntervalMin);
   server.listen(config.port, () => {
-    console.log(`[server] http://localhost:${config.port}  (google oauth: ${googleConfigured() ? 'on' : 'off'}, dev login: ${config.devLogin})`);
+    console.log(`[server] http://localhost:${config.port}  (sign-up ${config.allowSignup ? 'open' : 'closed'})`);
   });
   return server;
 }

@@ -10,7 +10,6 @@ export function useData(range) {
   const [events, setEvents] = useState([]);
   const [notes, setNotes] = useState([]);
   const [countdowns, setCountdowns] = useState([]);
-  const [google, setGoogle] = useState({ available: false, connected: false, enabled: false });
   const [online, setOnline] = useState(true);
   const rangeRef = useRef(range);
   rangeRef.current = range;
@@ -32,7 +31,6 @@ export function useData(range) {
       const m = await api.me();
       setMe(m);
       setSettings(mergeSettings({ ...m.settings, ...pendingSettings.current }));
-      setGoogle(m.google);
       return m;
     } catch (e) {
       if (e.status === 401) setMe(null);
@@ -40,7 +38,6 @@ export function useData(range) {
       return null;
     }
   }, []);
-  const refreshGoogle = useCallback(() => api.googleStatus().then(setGoogle).catch(() => {}), []);
 
   useEffect(() => { loadMe(); }, [loadMe]);
   useEffect(() => { if (me) loadEvents(); }, [me, range.from, range.to, loadEvents]);
@@ -58,7 +55,6 @@ export function useData(range) {
       if (kind === 'notes') debounce('notes', loadNotes);
       if (kind === 'countdowns') debounce('countdowns', loadCountdowns);
       if (kind === 'settings') debounce('settings', loadMe);
-      if (kind === 'google') debounce('google', refreshGoogle);
     });
     const onFocus = () => loadEvents();
     window.addEventListener('focus', onFocus);
@@ -66,7 +62,7 @@ export function useData(range) {
       socket.close();
       window.removeEventListener('focus', onFocus);
     };
-  }, [me, loadEvents, loadNotes, loadCountdowns, loadMe, refreshGoogle]);
+  }, [me, loadEvents, loadNotes, loadCountdowns, loadMe]);
 
   const updateSettings = useCallback((patch) => {
     setSettings((cur) => mergeSettings({ ...cur, ...patch }));
@@ -80,8 +76,8 @@ export function useData(range) {
   }, []);
 
   return {
-    me, setMe, settings, updateSettings, events, setEvents, loadEvents,
+    me, setMe, loadMe, settings, updateSettings, events, setEvents, loadEvents,
     notes, setNotes, loadNotes, countdowns, setCountdowns, loadCountdowns,
-    google, refreshGoogle, online,
+    online,
   };
 }

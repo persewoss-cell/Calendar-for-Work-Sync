@@ -64,9 +64,9 @@ export function fromICS(text) {
 
 export function toCSV(events) {
   const q = (s) => `"${String(s ?? '').replace(/"/g, '""')}"`;
-  const rows = [['날짜', '종료일', '시작', '종료', '제목', '메모', '완료', '반복', '구글 반영'].map(q).join(',')];
+  const rows = [['날짜', '종료일', '시작', '종료', '제목', '메모', '완료', '반복'].map(q).join(',')];
   for (const e of events) {
-    rows.push([e.date, e.endDate, e.startTime || '', e.endTime || '', e.title, e.memo, e.done ? 'Y' : '', e.rrule, e.googleSync ? 'Y' : ''].map(q).join(','));
+    rows.push([e.date, e.endDate, e.startTime || '', e.endTime || '', e.title, e.memo, e.done ? 'Y' : '', e.rrule].map(q).join(','));
   }
   return '\uFEFF' + rows.join('\r\n');
 }

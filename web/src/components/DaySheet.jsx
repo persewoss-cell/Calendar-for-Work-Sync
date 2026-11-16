@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Modal } from './Modal.jsx';
-import { GoogleMark, Icon } from './Icon.jsx';
+import { Icon } from './Icon.jsx';
 import { holidaysOfYear } from '../lib/holidays.js';
 import { solarTermsOfYear } from '../lib/solarTerms.js';
 import { toLunar } from '../lib/lunar.js';
@@ -34,7 +34,6 @@ export function DaySheet({ date, s, items, onClose, onAdd, onToggle, onOpen, onN
               {it.title}
             </button>
             {it.rrule && <Icon name="repeat" size={12} />}
-            {it.googleSync && <GoogleMark size={12} />}
           </li>
         ))}
       </ul>

@@ -136,7 +136,6 @@ button { font: inherit; color: inherit; }
 .item.done .item-text { text-decoration: line-through; opacity: .55; }
 .item.more { opacity: .7; font-size: .9em; }
 .item-flag, .item-reminder { flex: none; opacity: .75; display: inline-grid; }
-.item.sync-error .item-flag.g { outline: 1px solid #ff8a80; border-radius: 50%; }
 .done-icon { color: #b9f6ca; flex: none; }
 
 /* inline line editor */
@@ -171,7 +170,6 @@ button { font: inherit; color: inherit; }
 .btn.ghost { background: transparent; border-color: transparent; }
 .btn.danger { color: #d32f2f; }
 .btn.small { padding: 4px 10px; font-size: 12px; }
-.btn.google { background: #fff; color: #333; border-color: #dadce0; padding: 10px 18px; font-weight: 600; }
 .link-btn { background: none; border: 0; color: #1e88e5; cursor: pointer; }
 .input, .select {
   padding: 7px 10px; border: 1px solid #cfd6df; border-radius: 6px; background: #fff; color: #222; font: inherit; min-width: 0;
@@ -190,10 +188,6 @@ button { font: inherit; color: inherit; }
 .color-dot.on { box-shadow: 0 0 0 2px #1e88e5; }
 .mini-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); cursor: pointer; padding: 0; }
 .mini-dot.on { outline: 2px solid #fff; }
-.google-box { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; background: #fff; border: 1px solid #e0e5eb; }
-.google-box.on { border-color: #90caf9; background: #f3f9ff; }
-.google-box-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.google-box-text small { color: #6b7684; }
 .notice { background: #fff8e1; border: 1px solid #ffe082; border-radius: 6px; padding: 8px 10px; color: #6d5200; display: flex; align-items: center; gap: 10px; justify-content: space-between; }
 .error { color: #ffcdd2; }
 .muted { color: #8a95a3; }
@@ -336,6 +330,8 @@ body.card-window #root > div { height: 100vh; border-radius: 6px; }
 .login-card h1 { margin: 4px 0 0; font-size: 24px; }
 .login-card p { margin: 0 0 8px; opacity: .9; line-height: 1.5; }
 .login-card .btn.ghost { color: #fff; }
+.login-card .input { width: 100%; }
+.login-card .btn.wide { width: 100%; justify-content: center; padding: 10px; }
 
 /* ---------- mobile ---------- */
 .compact { padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }

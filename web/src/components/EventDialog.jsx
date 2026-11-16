@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Modal, Toggle } from './Modal.jsx';
-import { GoogleMark, Icon } from './Icon.jsx';
+import { Modal } from './Modal.jsx';
+import { Icon } from './Icon.jsx';
 import { REPEAT_PRESETS } from '../lib/recurrence.js';
 
 export const COLORS = ['', '#ef5350', '#ff9800', '#fdd835', '#66bb6a', '#26c6da', '#42a5f5', '#7e57c2', '#ec407a', '#8d6e63'];
@@ -10,14 +10,7 @@ const REMINDERS = [
   { value: 60, label: '1시간 전' }, { value: 120, label: '2시간 전' }, { value: 1440, label: '1일 전' },
 ];
 
-const SYNC_TEXT = {
-  synced: '구글 캘린더에 반영됨',
-  pending: '반영 대기 중',
-  error: '반영 실패',
-  none: '',
-};
-
-export function EventDialog({ item, google, onSave, onDelete, onClose }) {
+export function EventDialog({ item, onSave, onDelete, onClose }) {
   const isNew = !item._id;
   const [f, setF] = useState({
     title: item.title || '',
@@ -31,7 +24,6 @@ export function EventDialog({ item, google, onSave, onDelete, onClose }) {
     reminder: item.reminder ?? '',
     rrule: item.rrule || '',
     done: Boolean(item.done),
-    googleSync: isNew ? Boolean(google.enabled && google.defaultOn) : Boolean(item.googleSync),
   });
   const set = (k) => (v) => setF((p) => ({ ...p, [k]: v?.target ? (v.target.type === 'checkbox' ? v.target.checked : v.target.value) : v }));
   const presetKnown = REPEAT_PRESETS.some((p) => p.value === f.rrule);
@@ -47,7 +39,6 @@ export function EventDialog({ item, google, onSave, onDelete, onClose }) {
       color: f.color,
       reminder: f.reminder === '' ? null : Number(f.reminder),
       rrule: f.rrule,
-      googleSync: f.googleSync,
     };
     if (!item.rrule) out.done = f.done;
     onSave(out);
@@ -121,21 +112,6 @@ export function EventDialog({ item, google, onSave, onDelete, onClose }) {
           )}
         </div>
         <textarea className="input memo" rows={4} value={f.memo} onChange={set('memo')} placeholder="메모" />
-
-        <div className={`google-box ${f.googleSync ? 'on' : ''}`}>
-          <GoogleMark size={18} />
-          <div className="google-box-text">
-            <strong>구글 캘린더에 반영</strong>
-            <small>
-              {!google.connected ? '계정 설정에서 구글 캘린더를 연결하세요.'
-                : !google.enabled ? '계정 설정에서 구글 캘린더 동기화를 켜면 반영됩니다.'
-                  : f.googleSync ? (SYNC_TEXT[item.syncState] || '저장하면 구글 캘린더에 올라갑니다.')
-                    : item.googleEventId ? '끄고 저장하면 구글 캘린더에서 지워집니다. (이 앱에는 남아요)' : '이 앱에만 저장됩니다.'}
-              {item.syncState === 'error' && item.syncError ? ` — ${item.syncError}` : ''}
-            </small>
-          </div>
-          <Toggle checked={f.googleSync} onChange={set('googleSync')} />
-        </div>
       </div>
     </Modal>
   );

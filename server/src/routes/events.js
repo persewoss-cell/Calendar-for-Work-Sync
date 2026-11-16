@@ -1,13 +1,11 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import { EDITABLE_EVENT_FIELDS, Event } from '../models/Event.js';
-import { canSync, pushInBackground } from '../lib/googleSync.js';
 import { notify } from '../lib/realtime.js';
 
 export const eventsRouter = Router();
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const NO_PUSH_FIELDS = new Set(['order', 'doneDates']);
 
 function pick(body) {
   const out = {};
@@ -19,10 +17,6 @@ function pick(body) {
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const validId = (id) => mongoose.isValidObjectId(id);
-
-function markForPush(ev) {
-  if (ev.googleSync || ev.googleEventId) ev.syncState = 'pending';
-}
 
 // Events overlapping [from, to] plus every repeating event (expanded on the client).
 eventsRouter.get('/', async (req, res) => {
@@ -50,29 +44,25 @@ eventsRouter.get('/export', async (req, res) => {
 eventsRouter.post('/', async (req, res) => {
   const data = pick(req.body);
   if (!DATE.test(data.date || '')) return res.status(400).json({ error: 'date required' });
-  if (!('googleSync' in data)) data.googleSync = Boolean(req.user.google?.enabled && req.user.google?.defaultOn);
   if (!('order' in data)) {
     const last = await Event.findOne({ userId: req.user._id, date: data.date, deleted: false }).sort({ order: -1 });
     data.order = last ? last.order + 1 : 0;
   }
   const ev = new Event({ ...data, userId: req.user._id });
-  markForPush(ev);
   await ev.save();
   notify(req.user._id, 'events');
-  pushInBackground(req.user, ev);
   res.status(201).json(ev);
 });
 
-// Bulk create for "불러오기" (import). Imported events are not pushed unless asked.
+// Bulk create for "불러오기" (import).
 eventsRouter.post('/bulk', async (req, res) => {
   const list = Array.isArray(req.body?.events) ? req.body.events.slice(0, 5000) : [];
   const docs = list
     .map(pick)
     .filter((d) => DATE.test(d.date || ''))
-    .map((d) => ({ ...d, userId: req.user._id, source: 'import', googleSync: Boolean(d.googleSync && req.user.google?.enabled), syncState: d.googleSync ? 'pending' : 'none' }));
+    .map((d) => ({ ...d, userId: req.user._id, source: 'import' }));
   const created = await Event.insertMany(docs);
   notify(req.user._id, 'events');
-  for (const ev of created) if (ev.googleSync) pushInBackground(req.user, ev);
   res.json({ created: created.length });
 });
 
@@ -97,9 +87,7 @@ eventsRouter.post('/rollover', async (req, res) => {
   for (const ev of stale) {
     ev.date = today;
     ev.endDate = today;
-    markForPush(ev);
     await ev.save();
-    pushInBackground(req.user, ev);
   }
   if (stale.length) notify(req.user._id, 'events');
   res.json({ moved: stale.length });
@@ -113,11 +101,8 @@ eventsRouter.patch('/:id', async (req, res) => {
   if (data.date && !DATE.test(data.date)) return res.status(400).json({ error: 'bad date' });
   Object.assign(ev, data);
   if ('date' in data && !('endDate' in data) && ev.endDate < ev.date) ev.endDate = ev.date;
-  const needsPush = Object.keys(data).some((k) => !NO_PUSH_FIELDS.has(k));
-  if (needsPush) markForPush(ev);
   await ev.save();
   notify(req.user._id, 'events');
-  if (needsPush) pushInBackground(req.user, ev);
   res.json(ev);
 });
 
@@ -127,9 +112,7 @@ eventsRouter.delete('/:id', async (req, res) => {
   if (!ev) return res.status(404).json({ error: 'not found' });
   ev.deleted = true;
   ev.deletedAt = new Date();
-  markForPush(ev);
   await ev.save();
   notify(req.user._id, 'events');
-  pushInBackground(req.user, ev);
-  res.json({ ok: true, google: canSync(req.user) });
+  res.json({ ok: true });
 });

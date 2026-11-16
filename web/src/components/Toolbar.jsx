@@ -35,14 +35,13 @@ const Item = ({ icon, children, onClick, right, disabled }) => (
   </button>
 );
 
-export function Toolbar({ s, today, anchor, google, syncing, actions }) {
+export function Toolbar({ s, today, anchor, actions }) {
   const [y, m, d] = parts(today);
   const wd = (s.language === 'en' ? WEEKDAYS.en : WEEKDAYS.ko)[weekday(today)];
   const title = s.language === 'en' ? `Today is ${wd}, ${today}` : `오늘은 ${y}년${m}월${d}일 ${wd}`;
   const [ay, am] = parts(anchor);
   const away = s.viewStyle === 'month' ? anchor.slice(0, 7) !== today.slice(0, 7) : false;
   const color = s.titleButtonColor;
-  const cloudState = !google.enabled ? 'off' : google.lastError ? 'error' : 'ok';
 
   return (
     <header className={`toolbar ${s.showTitleBar ? '' : 'autohide'}`}>
@@ -61,14 +60,8 @@ export function Toolbar({ s, today, anchor, google, syncing, actions }) {
           <Item icon={s.showNotes ? 'eyeOff' : 'eye'} onClick={actions.toggleNotes}>{s.showNotes ? '메모·카드 숨기기' : '메모·카드 보이기'}</Item>
         </Dropdown>
         <button className="icon-btn" style={{ color }} title="모바일 연결" aria-label="모바일 연결" onClick={actions.openMobile}><Icon name="phone" size={19} /></button>
-        <button className="icon-btn" style={{ color }} aria-label="구글 캘린더 동기화"
-          title={cloudState === 'off' ? '구글 캘린더 동기화 꺼짐' : cloudState === 'error' ? `동기화 오류: ${google.lastError}` : '구글 캘린더 동기화 — 눌러서 지금 동기화'}
-          onClick={actions.cloud}>
-          <Icon name={syncing ? 'sync' : cloudState === 'off' ? 'cloudOff' : 'cloud'} size={19} className={syncing ? 'spin' : ''} />
-          {cloudState === 'error' && <span className="badge-dot" />}
-        </button>
         <button className="icon-btn" style={{ color }} title="계정 설정" aria-label="계정 설정" onClick={actions.openAccount}>
-          <Icon name="user" size={19} />{!google.connected && <span className="badge-dot" />}
+          <Icon name="user" size={19} />
         </button>
         <button className="icon-btn" style={{ color }} title="이전" aria-label="이전" onClick={() => actions.step(-1)}><Icon name="left" size={19} /></button>
         <button className="icon-btn" style={{ color }} title="다음" aria-label="다음" onClick={() => actions.step(1)}><Icon name="right" size={19} /></button>

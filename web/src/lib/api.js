@@ -5,22 +5,24 @@ async function request(method, url, body) {
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
+  const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
   if (res.status === 401) {
-    const err = new Error('unauthorized');
+    const err = new Error(data?.error && data.error !== 'unauthorized' ? data.error : '로그인이 필요합니다.');
     err.status = 401;
     throw err;
   }
-  const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
   if (!res.ok) throw Object.assign(new Error(data?.error || res.statusText), { status: res.status });
   return data;
 }
 
 export const api = {
   authConfig: () => request('GET', '/auth/config'),
-  devLogin: () => request('POST', '/auth/dev'),
+  login: (body) => request('POST', '/auth/login', body),
+  register: (body) => request('POST', '/auth/register', body),
   logout: () => request('POST', '/auth/logout'),
   me: () => request('GET', '/api/me'),
   saveSettings: (s) => request('PUT', '/api/settings', s),
+  updateAccount: (body) => request('PUT', '/api/account', body),
 
   events: (from, to) => request('GET', `/api/events?from=${from}&to=${to}`),
   search: (q) => request('GET', `/api/events/search?q=${encodeURIComponent(q)}`),
@@ -41,10 +43,4 @@ export const api = {
   createCountdown: (c) => request('POST', '/api/countdowns', c),
   updateCountdown: (id, c) => request('PATCH', `/api/countdowns/${id}`, c),
   deleteCountdown: (id) => request('DELETE', `/api/countdowns/${id}`),
-
-  googleStatus: () => request('GET', '/api/google/status'),
-  googleCalendars: () => request('GET', '/api/google/calendars'),
-  googleConfig: (c) => request('PUT', '/api/google/config', c),
-  googleSync: () => request('POST', '/api/google/sync'),
-  googleBulkToggle: (ids, googleSync) => request('POST', '/api/google/bulk-toggle', { ids, googleSync }),
 };
