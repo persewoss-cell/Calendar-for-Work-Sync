@@ -5,6 +5,7 @@ import { Icon } from './Icon.jsx';
 import { api } from '../lib/api.js';
 import { download, fromICS, toCSV, toICS } from '../lib/ics.js';
 import { todayIn } from '../lib/date.js';
+import { parseCalendarXlsx } from '../lib/xlsx.js';
 
 export function SearchDialog({ onPick, onClose }) {
   const [q, setQ] = useState('');
@@ -51,6 +52,7 @@ export function DateDialog({ value, onPick, onClose }) {
 
 export function ExportDialog({ mode, s, onClose, onImported }) {
   const [status, setStatus] = useState('');
+  const [preview, setPreview] = useState(null); // xlsx: { fresh, dup, from, to, name }
   const fileRef = useRef(null);
   const stamp = todayIn(s.timezone);
 
@@ -68,7 +70,50 @@ export function ExportDialog({ mode, s, onClose, onImported }) {
     setStatus(`${events.length}개 일정을 내보냈습니다.`);
   };
 
+  // Excel (A = 날짜, B = 일정 줄): show what will be added, skip items that already exist.
+  const previewXlsx = async (file) => {
+    setStatus('엑셀 읽는 중…');
+    setPreview(null);
+    try {
+      const { events, skippedRows } = await parseCalendarXlsx(await file.arrayBuffer());
+      if (!events.length) return setStatus('가져올 일정이 없습니다. A열에 날짜, B열에 일정이 있는지 확인하세요.');
+      const existing = new Set((await api.exportEvents()).map((e) => `${e.date}|${e.title.trim()}`));
+      const seen = new Set();
+      const fresh = [];
+      let dup = 0;
+      const perDay = {};
+      for (const e of events) {
+        const key = `${e.date}|${e.title}`;
+        if (existing.has(key) || seen.has(key)) { dup++; continue; }
+        seen.add(key);
+        perDay[e.date] = (perDay[e.date] || 0) + 1;
+        fresh.push({ ...e, order: 1000 + perDay[e.date] }); // after what the day already has
+      }
+      const dates = events.map((e) => e.date).sort();
+      setPreview({ fresh, dup, skippedRows, from: dates[0], to: dates[dates.length - 1], name: file.name });
+      setStatus('');
+    } catch (e) {
+      setStatus(`엑셀을 읽지 못했습니다: ${e.message}`);
+    }
+  };
+
+  const confirmXlsx = async () => {
+    const { fresh, dup } = preview;
+    setPreview(null);
+    setStatus('저장하는 중…');
+    try {
+      let created = 0;
+      for (let i = 0; i < fresh.length; i += 1000) created += (await api.bulkCreate(fresh.slice(i, i + 1000))).created;
+      setStatus(`일정 ${created}개를 추가했습니다.${dup ? ` (이미 있던 ${dup}개는 건너뜀)` : ''}`);
+      onImported?.();
+    } catch (e) {
+      setStatus(`저장 실패: ${e.message}`);
+    }
+  };
+
   const doImport = async (file) => {
+    if (/\.xlsx$/i.test(file.name)) return previewXlsx(file);
+    if (/\.xls$/i.test(file.name)) return setStatus('예전 엑셀 형식(.xls)은 읽을 수 없습니다. 엑셀에서 「다른 이름으로 저장 → Excel 통합 문서(.xlsx)」로 저장한 뒤 올려 주세요.');
     setStatus('불러오는 중…');
     try {
       const text = await file.text();
@@ -102,9 +147,36 @@ export function ExportDialog({ mode, s, onClose, onImported }) {
         </div>
       ) : (
         <div className="form">
-          <p className="muted">백업 파일(.json) 또는 iCalendar 파일(.ics)을 고르세요. 기존 일정은 그대로 두고 추가됩니다.</p>
-          <input ref={fileRef} type="file" accept=".json,.ics" hidden onChange={(e) => e.target.files[0] && doImport(e.target.files[0])} />
+          <p className="muted">엑셀(.xlsx), 백업 파일(.json), iCalendar 파일(.ics)을 고를 수 있습니다. 기존 일정은 그대로 두고 추가됩니다.</p>
+          <div className="xlsx-guide">
+            <b>엑셀 양식</b>
+            <table>
+              <tbody>
+                <tr><th /><th>A</th><th>B</th></tr>
+                <tr><th>1</th><td>2026-12-23</td><td>• 창의돋음제출</td></tr>
+                <tr><th>2</th><td>2026-12-07</td><td>• 만족도조사<br />• 결과보고</td></tr>
+              </tbody>
+            </table>
+            <small>A열 날짜, B열 일정. 한 칸에 여러 줄이면 줄마다 일정 하나가 됩니다. 앞의 •는 빼고 저장하고, 같은 날 같은 일정이 이미 있으면 건너뜁니다.</small>
+          </div>
+          <input ref={fileRef} type="file" accept=".xlsx,.xls,.json,.ics" hidden
+            onChange={(e) => { const f = e.target.files[0]; e.target.value = ''; if (f) doImport(f); }} />
           <button className="big-btn" onClick={() => fileRef.current.click()}><Icon name="upload" /> 파일 선택</button>
+          {preview && (
+            <div className="xlsx-preview">
+              <div><b>{preview.name}</b></div>
+              <div>{preview.from} ~ {preview.to}</div>
+              <div>추가할 일정 <b>{preview.fresh.length}개</b>{preview.dup ? ` · 이미 있어 건너뜀 ${preview.dup}개` : ''}{preview.skippedRows ? ` · 날짜를 못 읽은 행 ${preview.skippedRows}개` : ''}</div>
+              <ul>
+                {preview.fresh.slice(0, 5).map((e, i) => <li key={i}>{e.date} · {e.title}</li>)}
+                {preview.fresh.length > 5 && <li className="muted">… 외 {preview.fresh.length - 5}개</li>}
+              </ul>
+              <div className="inline">
+                <button className="btn" onClick={() => setPreview(null)}>취소</button>
+                <button className="btn primary" disabled={!preview.fresh.length} onClick={confirmXlsx}>{preview.fresh.length}개 추가</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {status && <p className="notice">{status}</p>}
