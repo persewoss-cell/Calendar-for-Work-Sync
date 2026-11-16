@@ -578,3 +578,9 @@ body.settings-window-body { background: #d4d9e0; }
 .settings-layer.standalone .settings-window { width: 100vw; height: 100vh; max-height: none; max-width: none; border-radius: 0; box-shadow: none; }
 .settings-layer.standalone .settings-titlebar { -webkit-app-region: drag; cursor: default; }
 .settings-layer.standalone .settings-titlebar button { -webkit-app-region: no-drag; }
+
+/* trash icon on checked items */
+.item-delete { flex: none; margin-left: auto; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 3px; background: none; color: inherit; opacity: .55; cursor: pointer; display: grid; place-items: center; }
+.item-delete:hover { opacity: 1; background: rgba(255, 82, 82, .85); color: #fff; }
+.done-icon + .item-delete, .item-flag + .item-delete { margin-left: 2px; }
+.compact .item-delete { display: none; }

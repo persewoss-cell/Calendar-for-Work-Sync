@@ -191,13 +191,25 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events, s.editSound]);
 
+  // Trash icon on a checked item: ask, then delete (a repeating item loses only this date).
+  const deleteDone = useCallback((item) => {
+    const msg = item.rrule
+      ? `반복 일정 「${item.title}」을(를) 이 날짜(${item.occ})에서만 삭제할까요?`
+      : `「${item.title}」 일정을 삭제할까요?`;
+    if (!window.confirm(msg)) return;
+    deleteOccurrence(item, 'occurrence');
+    playSound(s.editSound);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.editSound]);
+
   const openEditor = useCallback((date, rect) => setEditor({ date, rect }), []);
 
   const handlers = useMemo(() => ({
     onOpenEditor: openEditor,
     onToggle: toggleDone,
+    onDelete: deleteDone,
     onDropItem: dropItem,
-  }), [openEditor, toggleDone, dropItem]);
+  }), [openEditor, toggleDone, deleteDone, dropItem]);
 
   // ---------- 접기 / 펼치기 ----------
   const toggleCollapsed = useCallback(() => {

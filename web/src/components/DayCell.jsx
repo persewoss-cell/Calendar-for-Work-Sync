@@ -6,7 +6,7 @@ import { sanitizeHtml } from '../../../shared/sanitize.js';
 
 const REMINDER_LABEL = (min) => (min === 0 ? '정시' : min < 60 ? `${min}분 전` : min < 1440 ? `${min / 60}시간 전` : `${min / 1440}일 전`);
 
-function ItemRow({ item, index, s, listStyle, onToggle, onDragStart }) {
+function ItemRow({ item, index, s, listStyle, onToggle, onDelete, onDragStart }) {
   const marker = listStyle === 'number' ? `${index + 1}.` : listStyle === 'bullet' ? '•' : '';
   const textBg = s.textBackground === 'light' ? 'rgba(255,255,255,.22)' : s.textBackground === 'dark' ? 'rgba(0,0,0,.25)' : '';
   return (
@@ -34,13 +34,19 @@ function ItemRow({ item, index, s, listStyle, onToggle, onDragStart }) {
         <span className="item-reminder" title={`알림: ${REMINDER_LABEL(item.reminder)}`}><Icon name="bell" size={10} /></span>
       )}
       {item.rrule && <Icon name="repeat" size={10} className="item-flag" />}
+      {item.done && onDelete && (
+        <button type="button" className="item-delete" title="삭제" aria-label={`${item.title} 삭제`}
+          onClick={(e) => { e.stopPropagation(); onDelete(item); }} onDoubleClick={(e) => e.stopPropagation()}>
+          <Icon name="trash" size={11} />
+        </button>
+      )}
     </li>
   );
 }
 
 function DayCellImpl({
   date, today, s, items, info, inMonth, restKind, editing, highlight, monthLabel, weekNo, dayBg, dayList,
-  onOpenEditor, onToggle, onDropItem, compact,
+  onOpenEditor, onToggle, onDelete, onDropItem, compact,
 }) {
   const [dragOver, setDragOver] = useState(false);
   const day = Number(date.slice(8));
@@ -105,7 +111,7 @@ function DayCellImpl({
       {!s.hideTasks && (
         <ul className="items">
           {(compact ? visible.slice(0, 3) : visible).map((item, i) => (
-            <ItemRow key={item.key} item={item} index={i} s={s} listStyle={dayList || s.listStyle} onToggle={onToggle}
+            <ItemRow key={item.key} item={item} index={i} s={s} listStyle={dayList || s.listStyle} onToggle={onToggle} onDelete={onDelete}
               onDragStart={(e, it) => {
                 e.dataTransfer.setData('text/event-id', it._id);
                 e.dataTransfer.setData('text/from-date', it.day);
