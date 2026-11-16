@@ -205,7 +205,7 @@ export function DayEditor({ date, items, s, anchorRect, dayBg, listStyle, compac
     if (e.nativeEvent.isComposing || e.keyCode === 229) return; // Korean IME composing
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (e.ctrlKey || e.metaKey || e.shiftKey || compact) newLine();
+      if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || compact) newLine();
       else save();
     } else if (e.key === 'Escape') {
       e.preventDefault();
@@ -299,7 +299,7 @@ export function DayEditor({ date, items, s, anchorRect, dayBg, listStyle, compac
         onKeyDown={onKeyDown}
         style={{ fontFamily: 'var(--edit-font)', fontSize: `${s.editFontSize}px` }}
       />
-      <div className="de-hint">{compact ? 'Enter 줄바꿈 · ✓ 저장' : 'Enter 저장 · Ctrl+Enter 줄바꿈'}</div>
+      <div className="de-hint">{compact ? 'Enter 줄바꿈 · ✓ 저장' : 'Enter 저장 · Ctrl·Alt+Enter 줄바꿈'}</div>
       <div className="de-tools">
         <div className="de-row">
           {btn('', '굵게 (Ctrl+B)', () => exec('bold'), state.bold, <b>B</b>)}
