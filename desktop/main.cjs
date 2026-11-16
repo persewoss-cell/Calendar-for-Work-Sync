@@ -88,6 +88,64 @@ function startKeepingAtBottom() {
 }
 
 // ---------- windows ----------
+// ---------- keeping windows on a screen that exists (dual monitor → single) ----------
+/** Enough of the window (its title bar area) lies on some connected screen to be seen and grabbed. */
+function isOnScreen(b) {
+  return screen.getAllDisplays().some(({ workArea: w }) => {
+    const x1 = Math.max(b.x, w.x);
+    const x2 = Math.min(b.x + b.width, w.x + w.width);
+    const y1 = Math.max(b.y, w.y);
+    const y2 = Math.min(b.y + Math.min(b.height, 60), w.y + w.height);
+    return x2 - x1 >= Math.min(120, b.width) && y2 - y1 >= Math.min(30, b.height);
+  });
+}
+
+/** The bounds to use now: the saved ones if they are visible, else the same size centred on the main screen. */
+function visibleBounds(b) {
+  if (!b) return defaultBounds();
+  if (isOnScreen(b)) return b;
+  const { workArea: w } = screen.getPrimaryDisplay();
+  const width = Math.min(b.width, w.width);
+  const height = Math.min(b.height, w.height);
+  return { width, height, x: w.x + Math.round((w.width - width) / 2), y: w.y + Math.round((w.height - height) / 2) };
+}
+
+const sameBounds = (a, b) => a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+
+/**
+ * Put the calendar where the user left it if that screen is connected, otherwise somewhere visible.
+ * The user's own spot (config.bounds) is kept, so reconnecting the monitor brings it back there.
+ */
+function ensureOnScreen() {
+  if (!mainWin || mainWin.isDestroyed() || moveMode) return;
+  const target = visibleBounds(config.bounds);
+  const want = collapsed ? { x: target.x, y: target.y, width: CHIP, height: CHIP } : target;
+  if (!sameBounds(mainWin.getBounds(), want)) mainWin.setBounds(want);
+  if (settingsWin && !settingsWin.isDestroyed() && !isOnScreen(settingsWin.getBounds())) {
+    settingsWin.setBounds(visibleBounds(settingsWin.getBounds()));
+  }
+}
+
+let screenTimer;
+function watchScreens() {
+  const later = () => { clearTimeout(screenTimer); screenTimer = setTimeout(ensureOnScreen, 600); };
+  screen.on('display-added', later);
+  screen.on('display-removed', later);
+  screen.on('display-metrics-changed', later);
+}
+
+/** Tray: bring the calendar to the middle of the main screen and remember that spot. */
+function bringToCenter() {
+  const { workArea: w } = screen.getPrimaryDisplay();
+  const cur = config.bounds || defaultBounds();
+  const width = Math.min(cur.width, w.width);
+  const height = Math.min(cur.height, w.height);
+  config.bounds = { width, height, x: w.x + Math.round((w.width - width) / 2), y: w.y + Math.round((w.height - height) / 2) };
+  saveConfig();
+  setVisible(true);
+  ensureOnScreen();
+}
+
 function defaultBounds() {
   const { workArea } = screen.getPrimaryDisplay();
   const width = Math.round(workArea.width * 0.66);
@@ -96,7 +154,7 @@ function defaultBounds() {
 }
 
 function createMainWindow() {
-  const b = config.bounds || defaultBounds();
+  const b = visibleBounds(config.bounds);
   mainWin = new BrowserWindow({
     ...b,
     frame: false,
@@ -125,8 +183,10 @@ function createMainWindow() {
   mainWin.on('show', () => pinToDesktop(mainWin));
   // Clicking the calendar must not lift it above other programs.
   mainWin.on('focus', () => winDesktop.sendToBottom(mainWin));
+  // The window can only be moved/resized by the user in 위치 및 크기 mode. Moves at other times come
+  // from us or Windows (e.g. a monitor was unplugged) and must not replace the user's chosen spot.
   const remember = () => {
-    if (collapsed) return; // keep the expanded size
+    if (collapsed || !moveMode) return;
     config.bounds = mainWin.getBounds();
     saveConfig();
   };
@@ -168,7 +228,7 @@ function openSettings(tab = 'calendar') {
     settingsWin.focus();
     return;
   }
-  const b = config.settingsBounds || (() => {
+  const b = (config.settingsBounds && visibleBounds(config.settingsBounds)) || (() => {
     const { workArea } = screen.getPrimaryDisplay();
     return { width: 840, height: 680, x: workArea.x + Math.round((workArea.width - 840) / 2), y: workArea.y + Math.round((workArea.height - 680) / 2) };
   })();
@@ -199,19 +259,20 @@ function setVisible(visible) {
 function setCollapsed(on) {
   if (!mainWin || collapsed === on) return;
   if (on && moveMode) setMoveMode(false);
-  const expanded = config.bounds || mainWin.getBounds();
+  const here = visibleBounds(config.bounds); // where the calendar is shown on the current screens
   collapsed = on;
-  if (on) {
-    config.bounds = mainWin.getBounds();
-    saveConfig();
-    mainWin.setBounds({ x: expanded.x, y: expanded.y, width: CHIP, height: CHIP });
-  } else {
-    mainWin.setBounds(config.bounds || defaultBounds());
-  }
+  if (on) mainWin.setBounds({ x: here.x, y: here.y, width: CHIP, height: CHIP });
+  else mainWin.setBounds(here);
 }
 
 function setMoveMode(on) {
   if (on && collapsed) return;
+  // Leaving 위치 및 크기: the current spot becomes the user's spot (the 'moved' event alone is not
+  // sent on every platform).
+  if (!on && moveMode && mainWin && !mainWin.isDestroyed()) {
+    config.bounds = mainWin.getBounds();
+    saveConfig();
+  }
   moveMode = on;
   if (!mainWin) return;
   mainWin.setResizable(on);
@@ -301,6 +362,7 @@ function updateTray() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: visible ? '캘린더 숨기기' : '캘린더 보이기', click: () => setVisible(!visible) },
     { label: moveMode ? '위치 및 크기 조정 끝내기' : '위치 및 크기', click: () => setMoveMode(!moveMode) },
+    { label: '화면 가운데로 가져오기', click: bringToCenter },
     { label: '새로고침', click: () => mainWin?.reload() },
     { label: `업데이트 확인 (현재 ${app.getVersion()})`, click: () => checkForUpdates(true) },
     { type: 'separator' },
@@ -393,6 +455,7 @@ if (!app.requestSingleInstanceLock()) {
     await session.defaultSession.clearStorageData({ storages: ['serviceworkers', 'cachestorage'] }).catch(() => {});
     loadConfig();
     createTray();
+    watchScreens();
     if (config.serverUrl) createMainWindow();
     else openSetup();
     // 「자동 업데이트 확인」 setting (remembered from the web app's settings).
