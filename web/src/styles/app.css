@@ -606,3 +606,7 @@ body.settings-window-body { background: #d4d9e0; }
 .remove-alarm-choices { display: flex; flex-direction: column; gap: 8px; }
 .remove-alarm-choices .btn { justify-content: center; border-color: #f3c1c1; }
 .remove-alarm-note { font-size: 12px; margin: 12px 0 0; }
+.duration { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.duration label { display: inline-flex; align-items: center; gap: 4px; }
+.duration .input { width: 62px; text-align: center; }
+.duration.off { opacity: .5; }

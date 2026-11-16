@@ -69,6 +69,8 @@ export const DEFAULT_SETTINGS = {
   language: 'ko',
   autoLaunch: true,
   autoUpdate: true,
+  // 자동 접기: collapse after this long without a click, key press or scroll on the calendar
+  autoCollapse: { enabled: false, h: 0, m: 5, s: 0 },
   timezone: 'Asia/Seoul',
 
   // 메뉴 토글
@@ -84,6 +86,7 @@ export function mergeSettings(saved = {}) {
     ...DEFAULT_SETTINGS,
     ...saved,
     calText,
+    autoCollapse: { ...DEFAULT_SETTINGS.autoCollapse, ...(saved.autoCollapse || {}) },
     shortcuts: Object.fromEntries(Object.keys(DEFAULT_SETTINGS.shortcuts).map((k) => [k, { ...DEFAULT_SETTINGS.shortcuts[k], ...(saved.shortcuts?.[k] || {}) }])),
   };
 }

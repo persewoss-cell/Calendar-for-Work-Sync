@@ -125,6 +125,8 @@ function TextStyleRow({ label, value, min, max, onChange, hint, commonFont }) {
   );
 }
 
+export const autoCollapseMs = (a) => ((Number(a.h) || 0) * 3600 + (Number(a.m) || 0) * 60 + (Number(a.s) || 0)) * 1000;
+
 const ITEM_PROP = { editFontFamily: ['font-family', '글꼴'], editFontSize: ['font-size', '크기'], editTextColor: ['color', '색'] };
 
 export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', onOpenHelp, standalone = false }) {
@@ -343,6 +345,23 @@ export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', on
                       </label>
                     ))}
                   </div>
+                </Section>
+                <Section title="자동 접기">
+                  <Row label="자동 접기" hint="달력을 클릭하거나 입력·스크롤하지 않은 채 정한 시간이 지나면 왼쪽 위 작은 아이콘으로 접힙니다. 마우스를 그냥 움직이는 것은 세지 않습니다.">
+                    <Toggle checked={s.autoCollapse.enabled} onChange={(enabled) => update({ autoCollapse: { ...s.autoCollapse, enabled } })} />
+                  </Row>
+                  <Row label="접기까지 시간" hint={s.autoCollapse.enabled ? (autoCollapseMs(s.autoCollapse) < 5000 ? '5초보다 짧게는 정할 수 없어 5초로 동작합니다.' : '') : '자동 접기를 켜면 정할 수 있습니다.'}>
+                    <span className={`duration ${s.autoCollapse.enabled ? '' : 'off'}`}>
+                      {[['h', '시간', 23], ['m', '분', 59], ['s', '초', 59]].map(([k, unit, max]) => (
+                        <label key={k}>
+                          <input type="number" className="input" min="0" max={max} value={s.autoCollapse[k]} disabled={!s.autoCollapse.enabled}
+                            onChange={(e) => update({ autoCollapse: { ...s.autoCollapse, [k]: Math.min(max, Math.max(0, Math.floor(Number(e.target.value) || 0))) } })} />
+                          {unit}
+                        </label>
+                      ))}
+                      <span>후 접기</span>
+                    </span>
+                  </Row>
                 </Section>
                 <Section title="단축키">
                   <ShortcutRow label="캘린더 숨기기 단축키" value={s.shortcuts.hideCalendar} onChange={setShortcut('hideCalendar')} />

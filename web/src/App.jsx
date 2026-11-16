@@ -25,7 +25,7 @@ import { desktop, isDesktop } from './lib/desktop.js';
 import { CalendarView } from './components/CalendarView.jsx';
 import { Toolbar } from './components/Toolbar.jsx';
 import { EventDialog } from './components/EventDialog.jsx';
-import { SettingsDialog } from './components/SettingsDialog.jsx';
+import { autoCollapseMs, SettingsDialog } from './components/SettingsDialog.jsx';
 import { AccountDialog } from './components/AccountDialog.jsx';
 import { DateDialog, ExportDialog, HelpDialog, MobileDialog, SearchDialog } from './components/SmallDialogs.jsx';
 import { DayEditor } from './components/DayEditor.jsx';
@@ -224,6 +224,28 @@ export default function App() {
   }, []);
   useEffect(() => { if (me && isDesktop) desktop.setCollapsed?.(collapsed); }, [me, collapsed]);
 
+  // 자동 접기: after the set time without a click, key press, typing or scroll on the calendar.
+  // Plain mouse movement does not count. Never while an editor or a dialog is open.
+  const lastAction = useRef(Date.now());
+  const busy = Boolean(editor || dialog);
+  useEffect(() => {
+    const ac = s.autoCollapse;
+    if (!me || phone || collapsed || !ac?.enabled) return undefined;
+    const limit = Math.max(5000, autoCollapseMs(ac));
+    lastAction.current = Date.now();
+    const mark = () => { lastAction.current = Date.now(); };
+    const events = ['pointerdown', 'keydown', 'input', 'wheel', 'touchstart'];
+    events.forEach((ev) => window.addEventListener(ev, mark, true));
+    const t = setInterval(() => {
+      if (busy) { mark(); return; }
+      if (Date.now() - lastAction.current >= limit) {
+        setCollapsed(true);
+        try { localStorage.setItem('collapsed', '1'); } catch { /* ignore */ }
+      }
+    }, 1000);
+    return () => { clearInterval(t); events.forEach((ev) => window.removeEventListener(ev, mark, true)); };
+  }, [me, phone, collapsed, s.autoCollapse, busy]);
+
   // ---------- D-day ----------
   const countdownActions = {
     create: (c) => run(api.createCountdown(c).then((created) => data.setCountdowns((l) => [...l, created]))),
@@ -272,7 +294,8 @@ export default function App() {
   // ---------- desktop shell ----------
   useEffect(() => { if (me && isDesktop) desktop.applySettings(s); }, [me, s]);
   useEffect(() => (isDesktop ? desktop.onShortcut(shortcutAction) : undefined), [shortcutAction]);
-  useEffect(() => (desktop?.onSettingsPreview ? desktop.onSettingsPreview(data.previewSettings) : undefined), [data.previewSettings]);
+  // Changing settings in the separate settings window counts as using the calendar.
+  useEffect(() => (desktop?.onSettingsPreview ? desktop.onSettingsPreview((p) => { lastAction.current = Date.now(); data.previewSettings(p); }) : undefined), [data.previewSettings]);
   // Sticky notes and desktop D-day cards are gone: close any card windows an older PC app still has open.
   useEffect(() => { if (me && desktop?.syncCards) desktop.syncCards({ show: false, notes: [], countdowns: [] }); }, [me]);
 
