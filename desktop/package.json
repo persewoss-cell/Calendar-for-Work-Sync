@@ -7,8 +7,9 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "dist:win": "electron-builder --win nsis",
-    "dist:mac": "electron-builder --mac dmg"
+    "dist:win": "electron-builder --win nsis --publish never",
+    "dist:mac": "electron-builder --mac dmg",
+    "release:win": "electron-builder --win nsis --publish always"
   },
   "devDependencies": {
     "electron": "^33.2.1",
@@ -40,6 +41,18 @@
       "target": "dmg",
       "icon": "build/icon.png",
       "category": "public.app-category.productivity"
-    }
+    },
+    "artifactName": "WorkCal-Setup-${version}.${ext}",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "persewoss-cell",
+        "repo": "Calendar-for-Work-Sync",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }

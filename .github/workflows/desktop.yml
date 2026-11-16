@@ -1,9 +1,16 @@
-name: Build desktop app
+name: Release desktop app
 
+# Actions 탭 → "Release desktop app" → Run workflow → 새 버전 번호(예: 1.0.1) 입력.
+# 설치 파일이 GitHub Releases 에 올라가고, 설치된 PC 앱은 다음 실행 때 업데이트를 묻습니다.
 on:
   workflow_dispatch:
-  push:
-    tags: ['v*']
+    inputs:
+      version:
+        description: '새 버전 번호 (예: 1.0.1) — 이전 버전보다 커야 합니다'
+        required: true
+
+permissions:
+  contents: write
 
 jobs:
   windows:
@@ -11,16 +18,25 @@ jobs:
     defaults:
       run:
         working-directory: desktop
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Check version format
+        run: |
+          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "버전은 1.0.1 처럼 숫자.숫자.숫자 형식이어야 합니다." && exit 1
+          fi
       - run: npm ci
-      - run: npm run dist:win
+      - name: Set version
+        run: npm version "${{ inputs.version }}" --no-git-tag-version --allow-same-version
+      - name: Build and publish to GitHub Releases
+        run: npm run release:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/upload-artifact@v4
         with:
-          name: workcal-windows-installer
+          name: workcal-windows-${{ inputs.version }}
           path: desktop/release/*.exe

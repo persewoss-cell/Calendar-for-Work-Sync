@@ -1,5 +1,5 @@
 const {
-  app, BrowserWindow, Tray, Menu, ipcMain, shell, globalShortcut, screen, nativeImage, net,
+  app, BrowserWindow, Tray, Menu, ipcMain, shell, globalShortcut, screen, nativeImage, net, dialog,
 } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -174,6 +174,79 @@ function setMoveMode(on) {
   updateTray();
 }
 
+// ---------- auto update (GitHub Releases) ----------
+let updater = null;
+let updateState = 'idle'; // idle | checking | downloading | ready
+function getUpdater() {
+  if (updater || !app.isPackaged) return updater;
+  try {
+    ({ autoUpdater: updater } = require('electron-updater'));
+  } catch (err) {
+    console.warn('electron-updater unavailable', err.message);
+    return null;
+  }
+  updater.autoDownload = false; // ask first
+  updater.autoInstallOnAppQuit = true;
+  updater.on('update-available', async (info) => {
+    const { response } = await dialog.showMessageBox({
+      type: 'info',
+      title: '업무 캘린더 업데이트',
+      message: `새 버전 ${info.version}이(가) 있습니다.`,
+      detail: `지금 버전: ${app.getVersion()}\n\n「업데이트」를 누르면 자동으로 받아서 설치하고 다시 시작합니다.`,
+      buttons: ['업데이트', '나중에'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    });
+    if (response !== 0) { updateState = 'idle'; return; }
+    updateState = 'downloading';
+    tray?.setToolTip('업무 캘린더 — 업데이트 받는 중…');
+    updater.downloadUpdate().catch((err) => {
+      updateState = 'idle';
+      dialog.showErrorBox('업데이트 실패', `업데이트 파일을 받지 못했습니다.\n${err.message}`);
+    });
+  });
+  updater.on('update-not-available', () => { updateState = 'idle'; });
+  updater.on('download-progress', (p) => {
+    tray?.setToolTip(`업무 캘린더 — 업데이트 받는 중 ${Math.round(p.percent)}%`);
+    mainWin?.setProgressBar(p.percent / 100);
+  });
+  updater.on('update-downloaded', () => {
+    updateState = 'ready';
+    mainWin?.setProgressBar(-1);
+    quitting = true;
+    // Silent install, then start the new version.
+    setImmediate(() => updater.quitAndInstall(true, true));
+  });
+  updater.on('error', (err) => {
+    updateState = 'idle';
+    mainWin?.setProgressBar(-1);
+    tray?.setToolTip('업무 캘린더');
+    console.warn('update error', err?.message);
+  });
+  return updater;
+}
+
+function checkForUpdates(manual = false) {
+  const u = getUpdater();
+  if (!u) {
+    if (manual) dialog.showMessageBox({ message: '개발 실행 중에는 업데이트를 확인하지 않습니다.' });
+    return;
+  }
+  if (updateState !== 'idle') return;
+  updateState = 'checking';
+  u.checkForUpdates()
+    .then((r) => {
+      if (manual && (!r || !r.isUpdateAvailable)) {
+        dialog.showMessageBox({ type: 'info', message: `최신 버전(${app.getVersion()})을 쓰고 있습니다.` });
+      }
+    })
+    .catch((err) => {
+      updateState = 'idle';
+      if (manual) dialog.showErrorBox('업데이트 확인 실패', err.message);
+    });
+}
+
 // ---------- tray ----------
 function updateTray() {
   if (!tray) return;
@@ -182,6 +255,7 @@ function updateTray() {
     { label: visible ? '캘린더 숨기기' : '캘린더 보이기', click: () => setVisible(!visible) },
     { label: moveMode ? '위치 및 크기 조정 끝내기' : '위치 및 크기', click: () => setMoveMode(!moveMode) },
     { label: '새로고침', click: () => mainWin?.reload() },
+    { label: `업데이트 확인 (현재 ${app.getVersion()})`, click: () => checkForUpdates(true) },
     { type: 'separator' },
     { label: '서버 주소 변경', click: openSetup },
     { label: 'Windows 시작 시 실행', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin, click: (i) => app.setLoginItemSettings({ openAtLogin: i.checked }) },
@@ -205,6 +279,10 @@ function toAccelerator(keys) {
 function applySettings(s) {
   const prev = JSON.stringify(lastSettings.shortcuts || {});
   lastSettings = s;
+  if (typeof s.autoUpdate === 'boolean' && config.autoUpdate !== s.autoUpdate) {
+    config.autoUpdate = s.autoUpdate;
+    saveConfig();
+  }
   if (app.isPackaged && typeof s.autoLaunch === 'boolean' && app.getLoginItemSettings().openAtLogin !== s.autoLaunch) {
     app.setLoginItemSettings({ openAtLogin: s.autoLaunch });
   }
@@ -260,6 +338,8 @@ if (!app.requestSingleInstanceLock()) {
     createTray();
     if (config.serverUrl) createMainWindow();
     else openSetup();
+    // 「자동 업데이트 확인」 setting (remembered from the web app's settings).
+    if (config.autoUpdate !== false) setTimeout(() => checkForUpdates(false), 5000);
   });
   app.on('window-all-closed', (e) => e.preventDefault?.());
   app.on('before-quit', () => { quitting = true; });
