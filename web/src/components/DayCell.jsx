@@ -1,6 +1,7 @@
 import { memo, useState } from 'react';
 import { Icon } from './Icon.jsx';
 import { hexToRgba } from '../lib/settings.js';
+import { daysInMonth, parts, weekday } from '../lib/date.js';
 import { sanitizeHtml } from '../../../shared/sanitize.js';
 
 const REMINDER_LABEL = (min) => (min === 0 ? '정시' : min < 60 ? `${min}분 전` : min < 1440 ? `${min / 60}시간 전` : `${min / 1440}일 전`);
@@ -54,8 +55,21 @@ function DayCellImpl({
   if (dragOver) classes.push('drag-over');
   if (highlight) classes.push('highlight');
   if (editing) classes.push('editing');
-  if (s.monthGap && day === 1) classes.push('month-start');
-  if (s.monthGap && day <= 7) classes.push('month-top');
+  // 월 간격: draw the sides of this cell that face another month, so each month gets an outline.
+  const style = {};
+  if (dayBg) style.backgroundColor = hexToRgba(dayBg, 0.72);
+  if (s.monthGap) {
+    const [y, m] = parts(date);
+    const last = daysInMonth(y, m);
+    const w = '2px';
+    if (day <= 7) style['--edge-t'] = w;
+    if (day > last - 7) style['--edge-b'] = w;
+    // Left/right: where the neighbouring day is another month, and on the grid's outer columns.
+    const col = s.viewStyle === 'strip' ? -1 : (weekday(date) - (Number(s.weekStart) || 0) + 7) % 7;
+    if (day === 1 || col === 0) style['--edge-l'] = w;
+    if (day === last || col === 6) style['--edge-r'] = w;
+    if (Object.keys(style).some((k) => k.startsWith('--edge'))) classes.push('month-edge');
+  }
 
   const open = (e) => onOpenEditor(date, e.currentTarget.getBoundingClientRect());
 
@@ -63,7 +77,7 @@ function DayCellImpl({
     <div
       className={classes.join(' ')}
       data-date={date}
-      style={dayBg ? { backgroundColor: hexToRgba(dayBg, 0.72) } : undefined}
+      style={style}
       onDoubleClick={compact ? undefined : open}
       onClick={compact ? open : undefined}
       title={compact ? undefined : '더블클릭해서 입력'}

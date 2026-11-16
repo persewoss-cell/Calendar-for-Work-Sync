@@ -111,9 +111,14 @@ export function DayEditor({ date, items, s, anchorRect, dayBg, listStyle, compac
       setPos({ left: Math.max(8, (window.innerWidth - w) / 2), top: Math.max(8, window.innerHeight * 0.12) });
       return;
     }
-    const left = Math.min(Math.max(8, anchorRect.left), window.innerWidth - w - 8);
-    let top = anchorRect.top + 26;
-    if (top + h > window.innerHeight - 8) top = Math.max(8, window.innerHeight - h - 8);
+    // Beside the cell so its changes stay visible: right side first, then left, else overlap.
+    const gap = 6;
+    let left;
+    if (anchorRect.right + gap + w <= window.innerWidth - 4) left = anchorRect.right + gap;
+    else if (anchorRect.left - gap - w >= 4) left = anchorRect.left - gap - w;
+    else left = Math.min(Math.max(4, anchorRect.left), window.innerWidth - w - 4);
+    let top = anchorRect.top;
+    if (top + h > window.innerHeight - 4) top = Math.max(4, window.innerHeight - h - 4);
     setPos({ left, top });
   }, [anchorRect, compact]);
 

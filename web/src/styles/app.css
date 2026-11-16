@@ -43,7 +43,7 @@ button { font: inherit; color: inherit; }
 .toolbar.autohide { opacity: 0; transition: opacity .2s; }
 .toolbar.autohide:hover, .toolbar.autohide:focus-within { opacity: 1; }
 .tb-title { background: none; border: 0; cursor: pointer; letter-spacing: .3px; padding: 4px 10px; white-space: nowrap;
-  font-family: var(--font); font-size: var(--t-title-size); color: var(--t-title-color); font-weight: var(--t-title-weight); }
+  font-family: var(--t-title-font); font-size: var(--t-title-size); color: var(--t-title-color); font-weight: var(--t-title-weight); }
 .toolbar { min-height: 38px; height: auto; }
 .tb-right { display: flex; justify-content: flex-end; gap: 2px; }
 .tb-left { display: flex; }
@@ -82,7 +82,7 @@ button { font: inherit; color: inherit; }
 .weekday-row.with-week, .grid.with-week .grid-row { grid-template-columns: 30px repeat(var(--cols), minmax(0, 1fr)); }
 .weekday {
   text-align: center; padding: 5px 0;
-  font-size: var(--t-weekday-size); color: var(--t-weekday-color); font-weight: var(--t-weekday-weight);
+  font-family: var(--t-weekday-font); font-size: var(--t-weekday-size); color: var(--t-weekday-color); font-weight: var(--t-weekday-weight);
   background: linear-gradient(rgba(255, 255, 255, .12), rgba(255, 255, 255, .02)), var(--cell-bg);
   border-right: 1px solid rgba(120, 190, 255, .35); border-bottom: 2px solid rgba(120, 190, 255, .5);
 }
@@ -113,19 +113,23 @@ button { font: inherit; color: inherit; }
 .cell.highlight { animation: pulse 1.2s ease-in-out 2; }
 @keyframes pulse { 50% { background-color: rgba(255, 255, 255, .35); } }
 .cell.drag-over { background-color: rgba(255, 255, 255, .3); }
-.cell.month-start { border-left: 3px solid rgba(255, 255, 255, .55); }
-.cell.month-top { border-top: 3px solid rgba(255, 255, 255, .55); }
+/* 월 간격: an outline around each month's block of days */
+.cell.month-edge::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  border: 0 solid rgba(255, 255, 255, .85);
+  border-width: var(--edge-t, 0) var(--edge-r, 0) var(--edge-b, 0) var(--edge-l, 0);
+}
 .month-label { margin: calc(var(--cell-pad) * -1) calc(var(--cell-pad) * -1) 0; padding: 1px 4px; background: rgba(5, 40, 80, .45);
-  font-size: var(--t-month-size); color: var(--t-month-color); font-weight: var(--t-month-weight); }
+  font-family: var(--t-month-font); font-size: var(--t-month-size); color: var(--t-month-color); font-weight: var(--t-month-weight); }
 .cell-head { display: flex; align-items: baseline; gap: 6px; line-height: 1.3; white-space: nowrap; overflow: hidden; }
-.day-num { font-size: var(--t-day-size); color: var(--t-day-color); font-weight: var(--t-day-weight); }
+.day-num { font-family: var(--t-day-font); font-size: var(--t-day-size); color: var(--t-day-color); font-weight: var(--t-day-weight); }
 .cell-head .spacer { flex: 1; }
 .hol, .term { overflow: hidden; text-overflow: ellipsis; }
-.hol { font-size: var(--t-holiday-size); color: var(--t-holiday-color); font-weight: var(--t-holiday-weight); }
-.term { font-size: var(--t-term-size); color: var(--t-term-color); font-weight: var(--t-term-weight); }
+.hol { font-family: var(--t-holiday-font); font-size: var(--t-holiday-size); color: var(--t-holiday-color); font-weight: var(--t-holiday-weight); }
+.term { font-family: var(--t-term-font); font-size: var(--t-term-size); color: var(--t-term-color); font-weight: var(--t-term-weight); }
 .hol.observance { opacity: .8; }
 .week-no { font-size: 10px; opacity: .7; }
-.lunar { font-size: var(--t-lunar-size); color: var(--t-lunar-color); font-weight: var(--t-lunar-weight); opacity: .8; }
+.lunar { font-family: var(--t-lunar-font); font-size: var(--t-lunar-size); color: var(--t-lunar-color); font-weight: var(--t-lunar-weight); opacity: .8; }
 
 .items { font-family: var(--edit-font); font-size: var(--edit-size); color: var(--edit-color);
   list-style: none; margin: 1px 0 0; padding: 0; overflow-y: auto; flex: 1; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.3) transparent; }
@@ -566,3 +570,11 @@ body.phone-body { background: #fff; color: #222; }
 .q1 { background: #a78bfa; } .q2 { background: #38bdf8; } .q3 { background: #34d399; } .q4 { background: #fb923c; }
 .app.phone .modal-backdrop { z-index: 120; }
 .app.phone .day-editor { z-index: 125; }
+
+/* settings in its own desktop window */
+body.settings-window-body { background: #d4d9e0; }
+.boot.dark { color: #445; }
+.settings-layer.standalone { padding: 0; place-items: stretch; }
+.settings-layer.standalone .settings-window { width: 100vw; height: 100vh; max-height: none; max-width: none; border-radius: 0; box-shadow: none; }
+.settings-layer.standalone .settings-titlebar { -webkit-app-region: drag; cursor: default; }
+.settings-layer.standalone .settings-titlebar button { -webkit-app-region: no-drag; }

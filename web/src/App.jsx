@@ -13,6 +13,7 @@ function calTextVars(calText) {
     vars[`--t-${k}-size`] = `${v.size}px`;
     vars[`--t-${k}-color`] = v.color;
     vars[`--t-${k}-weight`] = v.bold ? 700 : 400;
+    vars[`--t-${k}-font`] = v.font ? fontCss(v.font) : 'var(--font)';
   }
   return vars;
 }
@@ -94,8 +95,8 @@ export default function App() {
 
   // Web fonts: load the ones chosen in settings and the ones used inside item text.
   useEffect(() => {
-    ensureFonts([s.fontFamily, s.editFontFamily, s.noteFontFamily, ...events.flatMap((e) => fontsInHtml(e.html))]);
-  }, [s.fontFamily, s.editFontFamily, s.noteFontFamily, events]);
+    ensureFonts([s.fontFamily, s.editFontFamily, s.noteFontFamily, ...Object.values(s.calText).map((t) => t.font), ...events.flatMap((e) => fontsInHtml(e.html))]);
+  }, [s.fontFamily, s.editFontFamily, s.noteFontFamily, s.calText, events]);
 
   const flash = useCallback((msg) => {
     setToast(msg);
@@ -260,6 +261,7 @@ export default function App() {
   // ---------- desktop shell ----------
   useEffect(() => { if (me && isDesktop) desktop.applySettings(s); }, [me, s]);
   useEffect(() => (isDesktop ? desktop.onShortcut(shortcutAction) : undefined), [shortcutAction]);
+  useEffect(() => (desktop?.onSettingsPreview ? desktop.onSettingsPreview(data.previewSettings) : undefined), [data.previewSettings]);
   useEffect(() => {
     if (!me || !isDesktop) return;
     desktop.syncCards({
@@ -328,9 +330,9 @@ export default function App() {
     toggleTasks: () => updateSettings({ hideTasks: !s.hideTasks }),
     openExport: () => setDialog({ type: 'export' }),
     openImport: () => setDialog({ type: 'import' }),
-    openSettings: () => setDialog({ type: 'settings' }),
+    openSettings: () => (desktop?.openSettings ? desktop.openSettings('calendar') : setDialog({ type: 'settings' })),
     openHelp: () => setDialog({ type: 'help' }),
-    openAbout: () => setDialog({ type: 'settings', tab: 'about' }),
+    openAbout: () => (desktop?.openSettings ? desktop.openSettings('about') : setDialog({ type: 'settings', tab: 'about' })),
     openCards: () => setDialog({ type: 'cards' }),
     quit: () => desktop?.quit(),
     logout,

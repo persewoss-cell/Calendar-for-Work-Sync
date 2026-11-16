@@ -26,6 +26,7 @@ function saveConfig() {
 
 let mainWin = null;
 let setupWin = null;
+let settingsWin = null;
 let tray = null;
 let moveMode = false;
 let collapsed = false;
@@ -157,6 +158,32 @@ function openSetup() {
     setupWin = null;
     if (!config.serverUrl) app.quit();
   });
+}
+
+/** 캘린더 설정 in its own window, so it can be moved anywhere on screen (not clipped by the calendar). */
+function openSettings(tab = 'calendar') {
+  const url = `${config.serverUrl}/#/settings/${encodeURIComponent(tab)}`;
+  if (settingsWin && !settingsWin.isDestroyed()) {
+    settingsWin.loadURL(url);
+    settingsWin.show();
+    settingsWin.focus();
+    return;
+  }
+  const b = config.settingsBounds || (() => {
+    const { workArea } = screen.getPrimaryDisplay();
+    return { width: 840, height: 680, x: workArea.x + Math.round((workArea.width - 840) / 2), y: workArea.y + Math.round((workArea.height - 680) / 2) };
+  })();
+  settingsWin = new BrowserWindow({
+    ...b, minWidth: 620, minHeight: 460, frame: false, skipTaskbar: true, show: false,
+    backgroundColor: '#d4d9e0', title: '캘린더 설정', icon: ICON, webPreferences: webPrefs,
+  });
+  lockNavigation(settingsWin);
+  settingsWin.loadURL(url);
+  settingsWin.once('ready-to-show', () => settingsWin.show());
+  const remember = () => { config.settingsBounds = settingsWin.getBounds(); saveConfig(); };
+  settingsWin.on('moved', remember);
+  settingsWin.on('resized', remember);
+  settingsWin.on('closed', () => { settingsWin = null; });
 }
 
 function cardKey(kind, id) { return `${kind}:${id}`; }
@@ -382,6 +409,8 @@ ipcMain.on('toggle-move', () => setMoveMode(!moveMode));
 ipcMain.on('set-collapsed', (_e, on) => setCollapsed(Boolean(on)));
 ipcMain.on('apply-settings', (_e, s) => applySettings(s));
 ipcMain.on('sync-cards', (_e, cards) => syncCards(cards));
+ipcMain.on('open-settings', (_e, tab) => openSettings(tab));
+ipcMain.on('settings-preview', (_e, patch) => mainWin?.webContents.send('settings-preview', patch));
 ipcMain.handle('save-server', async (_e, url) => {
   try {
     const res = await net.fetch(`${url}/healthz`);

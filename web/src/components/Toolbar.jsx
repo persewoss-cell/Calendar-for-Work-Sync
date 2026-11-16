@@ -67,6 +67,7 @@ export function Toolbar({ s, today, anchor, actions }) {
         <button className="icon-btn" style={{ color }} title="계정 설정" aria-label="계정 설정" onClick={actions.openAccount}>
           <Icon name="user" size={19} />
         </button>
+        <button className="icon-btn" style={{ color }} title="캘린더 설정" aria-label="캘린더 설정" onClick={actions.openSettings}><Icon name="settings" size={19} /></button>
         <button className="icon-btn" style={{ color }} title="이전" aria-label="이전" onClick={() => actions.step(-1)}><Icon name="left" size={19} /></button>
         <button className="icon-btn" style={{ color }} title="다음" aria-label="다음" onClick={() => actions.step(1)}><Icon name="right" size={19} /></button>
         <Dropdown icon="menu" title="메뉴" color={color}>

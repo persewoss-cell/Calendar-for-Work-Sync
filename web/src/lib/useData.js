@@ -89,8 +89,11 @@ export function useData(range) {
     }, 400);
   }, []);
 
+  // Apply settings sent from the desktop settings window (it saves them itself).
+  const previewSettings = useCallback((patch) => setSettings((cur) => mergeSettings({ ...cur, ...patch })), []);
+
   return {
-    me, setMe, loadMe, settings, updateSettings, events, setEvents, loadEvents, days, setDays,
+    me, setMe, loadMe, settings, updateSettings, previewSettings, events, setEvents, loadEvents, days, setDays,
     notes, setNotes, loadNotes, countdowns, setCountdowns, loadCountdowns,
     online,
   };

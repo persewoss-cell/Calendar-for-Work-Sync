@@ -9,6 +9,13 @@ contextBridge.exposeInMainWorld('workcalDesktop', {
   setCollapsed: (on) => ipcRenderer.send('set-collapsed', Boolean(on)),
   applySettings: (settings) => ipcRenderer.send('apply-settings', JSON.parse(JSON.stringify(settings))),
   syncCards: (cards) => ipcRenderer.send('sync-cards', cards),
+  openSettings: (tab) => ipcRenderer.send('open-settings', String(tab || 'calendar')),
+  previewSettings: (patch) => ipcRenderer.send('settings-preview', JSON.parse(JSON.stringify(patch))),
+  onSettingsPreview: (cb) => {
+    const handler = (_e, patch) => cb(patch);
+    ipcRenderer.on('settings-preview', handler);
+    return () => ipcRenderer.removeListener('settings-preview', handler);
+  },
   onShortcut: (cb) => {
     const handler = (_e, name) => cb(name);
     ipcRenderer.on('shortcut', handler);

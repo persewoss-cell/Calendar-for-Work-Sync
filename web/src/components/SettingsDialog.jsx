@@ -83,18 +83,19 @@ function ShortcutRow({ label, value, onChange }) {
 }
 
 /** Font picker grouped by kind, with a live sample. */
-function FontSelect({ value, onChange }) {
+function FontSelect({ value, onChange, commonFont }) {
   const groups = [...new Set(FONTS.map((f) => f.group))];
   return (
     <span className="font-select">
       <select className="select" value={value} onChange={(e) => onChange(e.target.value)} onFocus={ensureFontPreviews}>
+        {commonFont !== undefined && <option value="">공통 글꼴 사용</option>}
         {groups.map((g) => (
           <optgroup key={g} label={g}>
             {FONTS.filter((f) => f.group === g).map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
           </optgroup>
         ))}
       </select>
-      <span className="font-sample" style={{ fontFamily: fontCss(value) }}>가나다 123</span>
+      <span className="font-sample" style={{ fontFamily: fontCss(value || commonFont) }}>가나다 123</span>
     </span>
   );
 }
@@ -111,10 +112,11 @@ const CAL_TEXT = [
   ['lunar', '음력', 8, 20],
 ];
 
-/** One row of the calendar text table: size · color · bold. */
-function TextStyleRow({ label, value, min, max, onChange, hint }) {
+/** One row of the calendar text table: font · size · color · bold. */
+function TextStyleRow({ label, value, min, max, onChange, hint, commonFont }) {
   return (
     <Row label={label} hint={hint}>
+      <FontSelect value={value.font || ''} commonFont={commonFont} onChange={(font) => onChange({ ...value, font })} />
       <Select value={value.size} onChange={(size) => onChange({ ...value, size })} options={sizeOptions(min, max)} />
       <ColorInput value={value.color} onChange={(color) => onChange({ ...value, color })} />
       <button type="button" className={`bold-toggle ${value.bold ? 'on' : ''}`} title="굵게" aria-pressed={value.bold}
@@ -125,7 +127,7 @@ function TextStyleRow({ label, value, min, max, onChange, hint }) {
 
 const ITEM_PROP = { editFontFamily: ['font-family', '글꼴'], editFontSize: ['font-size', '크기'], editTextColor: ['color', '색'] };
 
-export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', onOpenHelp }) {
+export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', onOpenHelp, standalone = false }) {
   const [tab, setTab] = useState(initialTab);
   const set = (k) => (v) => update({ [k]: v });
   const setText = (k) => (v) => update({ calText: { ...s.calText, [k]: v } });
@@ -181,10 +183,11 @@ export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', on
   const current = TABS.find((t) => t.id === tab);
 
   return (
-    <div className="settings-layer">
+    <div className={standalone ? 'settings-layer standalone' : 'settings-layer'}>
       <div className="settings-window" role="dialog" aria-label="설정"
-        style={pos ? { position: 'absolute', left: pos.x, top: pos.y } : undefined}>
-        <div className="settings-titlebar" onPointerDown={onTitleDown} onPointerMove={onTitleMove} onPointerUp={onTitleUp} title="끌어서 옮길 수 있습니다">
+        style={pos && !standalone ? { position: 'absolute', left: pos.x, top: pos.y } : undefined}>
+        <div className="settings-titlebar" title="끌어서 옮길 수 있습니다"
+          {...(standalone ? {} : { onPointerDown: onTitleDown, onPointerMove: onTitleMove, onPointerUp: onTitleUp })}>
           <span className="app-mark" />캘린더 목록 - 설정
           <button className="icon-btn dark" onClick={onClose} aria-label="닫기"><Icon name="x" /></button>
         </div>
@@ -283,9 +286,9 @@ export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', on
               <>
                 <Section title="캘린더 글꼴 (달력의 제목·요일·날짜)">
                   <Row label="공통 글꼴"><FontSelect value={s.fontFamily} onChange={set('fontFamily')} /></Row>
-                  <div className="text-table-head"><span>항목</span><span>크기 · 색 · 굵게</span></div>
+                  <div className="text-table-head"><span>항목</span><span>글꼴 · 크기 · 색 · 굵게</span></div>
                   {CAL_TEXT.map(([k, label, min, max]) => (
-                    <TextStyleRow key={k} label={label} value={s.calText[k]} min={min} max={max} onChange={setText(k)}
+                    <TextStyleRow key={k} label={label} value={s.calText[k]} min={min} max={max} onChange={setText(k)} commonFont={s.fontFamily}
                       hint={k === 'lunar' && !s.showLunar ? '캘린더 탭에서 「음력」을 켜야 보입니다.' : k === 'term' && !s.showSolarTerms ? '캘린더 탭에서 「24절기」를 켜야 보입니다.' : k === 'holiday' && !s.showHolidays ? '캘린더 탭에서 「공휴일」을 켜야 보입니다.' : ''} />
                   ))}
                 </Section>
