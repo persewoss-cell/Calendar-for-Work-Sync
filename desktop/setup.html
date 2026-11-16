@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+<title>서버 주소 설정</title>
+<style>
+  body { margin: 0; font-family: 'Malgun Gothic', sans-serif; background: linear-gradient(135deg, #1e88e5, #0d47a1); color: #fff; display: grid; place-items: center; height: 100vh; }
+  .card { width: 380px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.3); border-radius: 12px; padding: 24px; }
+  h2 { margin: 0 0 6px; font-size: 18px; }
+  p { margin: 0 0 14px; font-size: 13px; opacity: .9; line-height: 1.5; }
+  input { width: 100%; box-sizing: border-box; padding: 9px 10px; border-radius: 6px; border: 0; font-size: 14px; }
+  button { margin-top: 12px; width: 100%; padding: 9px; border: 0; border-radius: 6px; background: #ffca28; color: #3a2c00; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .err { color: #ffcdd2; font-size: 12px; min-height: 16px; margin-top: 8px; }
+</style>
+</head>
+<body>
+  <form class="card" id="f">
+    <h2>캘린더 서버 주소</h2>
+    <p>배포한 서버 주소를 입력하세요. 모바일에서 여는 주소와 같습니다.<br />예) https://my-calendar.onrender.com</p>
+    <input id="url" placeholder="https://" autofocus />
+    <button>연결</button>
+    <div class="err" id="err"></div>
+  </form>
+  <script>
+    const q = new URLSearchParams(location.search);
+    document.getElementById('url').value = q.get('current') || '';
+    document.getElementById('f').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const url = document.getElementById('url').value.trim().replace(/\/$/, '');
+      const err = document.getElementById('err');
+      if (!/^https?:\/\//.test(url)) { err.textContent = 'http:// 또는 https:// 로 시작해야 합니다.'; return; }
+      err.textContent = '확인 중…';
+      const ok = await window.workcalSetup.save(url);
+      err.textContent = ok ? '' : '서버에 연결할 수 없습니다. 주소를 확인하세요.';
+    });
+  </script>
+</body>
+</html>

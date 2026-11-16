@@ -1,0 +1,32 @@
+{
+  "name": "workcal-desktop",
+  "productName": "업무 캘린더",
+  "version": "1.0.0",
+  "description": "바탕화면 업무 캘린더 (PC ↔ 모바일 ↔ 구글 캘린더 동기화)",
+  "main": "main.cjs",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac dmg"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.workcal.desktop",
+    "productName": "업무 캘린더",
+    "files": ["main.cjs", "preload.cjs", "setup.html", "build/icon.png"],
+    "directories": { "output": "release" },
+    "protocols": [{ "name": "WorkCal Login", "schemes": ["workcal"] }],
+    "win": { "target": "nsis", "icon": "build/icon.png" },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "업무 캘린더"
+    },
+    "mac": { "target": "dmg", "icon": "build/icon.png", "category": "public.app-category.productivity" }
+  }
+}
