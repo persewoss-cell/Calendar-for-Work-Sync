@@ -26,7 +26,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        navigateFallbackDenylist: [/^\/api/, /^\/auth/, /^\/socket\.io/],
+        navigateFallbackDenylist: [/^\/api/, /^\/auth/, /^\/socket\.io/, /^\/healthz/],
         runtimeCaching: [],
       },
     }),
