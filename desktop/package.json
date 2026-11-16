@@ -21,6 +21,7 @@
     "files": [
       "main.cjs",
       "preload.cjs",
+      "winDesktop.cjs",
       "setup.html",
       "build/icon.png"
     ],
@@ -50,9 +51,14 @@
         "repo": "Calendar-for-Work-Sync",
         "releaseType": "release"
       }
+    ],
+    "asarUnpack": [
+      "**/node_modules/koffi/**",
+      "**/node_modules/@koromix/**"
     ]
   },
   "dependencies": {
-    "electron-updater": "^6.8.11"
+    "electron-updater": "^6.8.11",
+    "koffi": "^3.3.8"
   }
 }

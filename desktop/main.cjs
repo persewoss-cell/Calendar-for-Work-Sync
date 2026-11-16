@@ -3,6 +3,7 @@ const {
 } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const winDesktop = require('./winDesktop.cjs');
 
 const ICON = path.join(__dirname, 'build', 'icon.png');
 
@@ -56,6 +57,14 @@ function lockNavigation(win) {
   });
 }
 
+// ---------- desktop layer ----------
+/** No taskbar button, survives Win+D, stays under normal app windows. */
+function pinToDesktop(win) {
+  if (!win || win.isDestroyed()) return;
+  win.setSkipTaskbar(true); // re-applied: Windows can drop it after hide/show
+  winDesktop.attachToDesktop(win);
+}
+
 // ---------- windows ----------
 function defaultBounds() {
   const { workArea } = screen.getPrimaryDisplay();
@@ -87,7 +96,13 @@ function createMainWindow() {
   });
   lockNavigation(mainWin);
   mainWin.loadURL(`${config.serverUrl}/`);
-  mainWin.once('ready-to-show', () => mainWin.showInactive());
+  mainWin.once('ready-to-show', () => {
+    mainWin.showInactive();
+    pinToDesktop(mainWin);
+  });
+  mainWin.on('show', () => pinToDesktop(mainWin));
+  // Clicking the calendar must not lift it above other programs.
+  mainWin.on('focus', () => winDesktop.sendToBottom(mainWin));
   const remember = () => {
     if (collapsed) return; // keep the expanded size
     config.bounds = mainWin.getBounds();
@@ -98,6 +113,12 @@ function createMainWindow() {
   mainWin.on('close', (e) => {
     if (!quitting) { e.preventDefault(); mainWin.hide(); }
   });
+  // Windows owned by the desktop are destroyed when Explorer restarts — come back.
+  mainWin.on('closed', () => {
+    mainWin = null;
+    collapsed = false;
+    if (!quitting) setTimeout(() => { if (!mainWin && !quitting) createMainWindow(); }, 3000);
+  });
   mainWin.webContents.on('did-fail-load', (_e, code, desc, url) => {
     if (url.startsWith(config.serverUrl)) setTimeout(() => mainWin?.loadURL(`${config.serverUrl}/`), 10000);
   });
@@ -106,7 +127,7 @@ function createMainWindow() {
 function openSetup() {
   if (setupWin) return setupWin.focus();
   setupWin = new BrowserWindow({
-    width: 460, height: 340, resizable: false, title: '서버 주소 설정', icon: ICON,
+    width: 460, height: 340, resizable: false, title: '서버 주소 설정', icon: ICON, skipTaskbar: true,
     autoHideMenuBar: true, webPreferences: webPrefs,
   });
   setupWin.loadFile(path.join(__dirname, 'setup.html'), { query: { current: config.serverUrl || '' } });
@@ -137,7 +158,12 @@ function openCard(kind, id, index) {
   });
   lockNavigation(win);
   win.loadURL(`${config.serverUrl}/#/card/${kind}/${id}`);
-  win.once('ready-to-show', () => mainWin?.isVisible() && win.showInactive());
+  win.once('ready-to-show', () => {
+    if (mainWin?.isVisible()) win.showInactive();
+    pinToDesktop(win);
+  });
+  win.on('show', () => pinToDesktop(win));
+  win.on('focus', () => winDesktop.sendToBottom(win));
   const remember = () => { config.cardBounds[key] = win.getBounds(); saveConfig(); };
   win.on('moved', remember);
   win.on('resized', remember);
@@ -210,7 +236,7 @@ function getUpdater() {
   updater.autoDownload = false; // ask first
   updater.autoInstallOnAppQuit = true;
   updater.on('update-available', async (info) => {
-    const { response } = await dialog.showMessageBox({
+    const { response } = await dialog.showMessageBox(mainWin, {
       type: 'info',
       title: '업무 캘린더 업데이트',
       message: `새 버전 ${info.version}이(가) 있습니다.`,
@@ -252,7 +278,7 @@ function getUpdater() {
 function checkForUpdates(manual = false) {
   const u = getUpdater();
   if (!u) {
-    if (manual) dialog.showMessageBox({ message: '개발 실행 중에는 업데이트를 확인하지 않습니다.' });
+    if (manual) dialog.showMessageBox(mainWin, { message: '개발 실행 중에는 업데이트를 확인하지 않습니다.' });
     return;
   }
   if (updateState !== 'idle') return;
@@ -260,7 +286,7 @@ function checkForUpdates(manual = false) {
   u.checkForUpdates()
     .then((r) => {
       if (manual && (!r || !r.isUpdateAvailable)) {
-        dialog.showMessageBox({ type: 'info', message: `최신 버전(${app.getVersion()})을 쓰고 있습니다.` });
+        dialog.showMessageBox(mainWin, { type: 'info', message: `최신 버전(${app.getVersion()})을 쓰고 있습니다.` });
       }
     })
     .catch((err) => {
