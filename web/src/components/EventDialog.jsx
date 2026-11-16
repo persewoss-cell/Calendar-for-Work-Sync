@@ -106,9 +106,18 @@ export function EventDialog({ item, onSave, onDelete, onClose, alarm = false }) 
           onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && save()} />
         <div className="form-grid">
           <label>시작일</label>
-          <input type="date" className="input" value={f.date} onChange={set('date')} />
+          <input type="date" className="input" value={f.date} onChange={(e) => {
+            const date = e.target.value;
+            if (!date) return;
+            // The end can't be before the start: move it along when the start passes it.
+            setF((p) => ({ ...p, date, endDate: p.endDate < date ? date : p.endDate }));
+          }} />
           <label>종료일</label>
-          <input type="date" className="input" value={f.endDate} min={f.date} onChange={set('endDate')} />
+          <input type="date" className="input" value={f.endDate} min={f.date} onChange={(e) => {
+            const endDate = e.target.value;
+            if (!endDate) return;
+            setF((p) => ({ ...p, endDate: endDate < p.date ? p.date : endDate }));
+          }} />
           <label>시간</label>
           <div className="inline">
             <label className="check"><input type="checkbox" checked={f.allDay} onChange={(e) => {
