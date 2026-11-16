@@ -79,7 +79,7 @@ export function DdayList({ countdowns, today, actions }) {
 }
 
 /** Upcoming items that have a reminder (next 90 days). */
-export function RemindersList({ today, version, onOpen, onNew }) {
+export function RemindersList({ today, version, onOpen, onNew, onRemove }) {
   const [list, setList] = useState(null);
   useEffect(() => {
     const to = addDays(today, 90);
@@ -107,6 +107,13 @@ export function RemindersList({ today, version, onOpen, onNew }) {
               <span className="remind-time">{it.startTime || '종일'}</span>
               <span className="grow">{it.title}</span>
               <span className="remind-when"><Icon name="bell" size={12} /> {reminderLabel(it)}</span>
+              {onRemove && (
+                <span role="button" tabIndex={0} className="remind-del" title="이 알림 지우기 (일정은 남음)" aria-label={`${it.title} 알림 지우기`}
+                  onClick={(e) => { e.stopPropagation(); onRemove(it); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onRemove(it); } }}>
+                  <Icon name="trash" size={13} />
+                </span>
+              )}
             </button>
           </div>
         );

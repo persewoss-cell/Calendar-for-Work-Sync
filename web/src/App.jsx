@@ -323,6 +323,13 @@ export default function App() {
     goToday: () => { setAnchor(null); setHighlight(today); setTimeout(() => setHighlight(null), 1500); },
     step: (dir) => setAnchor(stepAnchor(sv, anchorRaw ?? anchorFor(sv, today), dir)),
     openEvent: (item) => setDialog({ type: 'event', item, alarm: true }),
+    // Trash in the 알림 list: switch the alarm off (the item stays on the calendar).
+    removeReminder: (item) => {
+      const msg = item.rrule
+        ? `반복 일정 「${item.title}」의 알림을 지울까요?\n(모든 반복 날짜의 알림이 꺼지고, 일정은 달력에 남습니다)`
+        : `「${item.title}」의 알림을 지울까요?\n(일정은 달력에 남습니다)`;
+      if (window.confirm(msg)) updateEvent(item._id, { reminder: null });
+    },
     newReminder: () => setDialog({ type: 'event', item: { date: today, startTime: '09:00', reminder: 10 }, alarm: true }),
     collapse: toggleCollapsed,
     openMobile: () => setDialog({ type: 'mobile' }),

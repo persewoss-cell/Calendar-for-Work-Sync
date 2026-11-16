@@ -141,7 +141,7 @@ export function MobileShell({
             onStep={onStep} onOpenDay={onOpenDay} />
         )}
         {tab === 'reminders' && (
-          <div className="m-panel"><RemindersList today={today} version={version} onOpen={onOpenEvent} /></div>
+          <div className="m-panel"><RemindersList today={today} version={version} onOpen={onOpenEvent} onRemove={actions.removeReminder} /></div>
         )}
         {tab === 'countdowns' && (
           <div className="m-panel"><DdayList countdowns={countdowns} today={today} actions={countdownActions} /></div>

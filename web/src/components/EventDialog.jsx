@@ -26,8 +26,6 @@ function AllDayReminder({ date, value, onChange }) {
   const customDate = addDays(date, -daysBefore);
   return (
     <div className="inline allday-remind">
-      <input type="time" className="input" value={time} disabled={!has} aria-label="알림 시각"
-        onChange={(e) => e.target.value && onChange(joinAllDay(daysBefore, e.target.value))} />
       <select className="select" value={kind} aria-label="알림 날짜" onChange={(e) => {
         const v = e.target.value;
         if (v === '') { setCustom(false); onChange(''); return; }
@@ -43,6 +41,8 @@ function AllDayReminder({ date, value, onChange }) {
         <input type="date" className="input" value={customDate} max={date} aria-label="알림 날짜 지정"
           onChange={(e) => e.target.value && onChange(joinAllDay(diffDays(e.target.value, date), time))} />
       )}
+      <input type="time" className="input" value={time} disabled={!has} aria-label="알림 시각"
+        onChange={(e) => e.target.value && onChange(joinAllDay(daysBefore, e.target.value))} />
     </div>
   );
 }

@@ -67,7 +67,8 @@ export function Toolbar({ s, today, anchor, actions, countdowns, ddayActions, ve
           {(close) => (
             <RemindersList today={today} version={version}
               onOpen={(it) => { close(); actions.openEvent(it); }}
-              onNew={() => { close(); actions.newReminder(); }} />
+              onNew={() => { close(); actions.newReminder(); }}
+              onRemove={actions.removeReminder} />
           )}
         </Dropdown>
         <Dropdown icon="timer" title="D-day" color={color} panel>
