@@ -5,6 +5,7 @@ import { solarTermsOfYear } from '../lib/solarTerms.js';
 import { toLunar } from '../lib/lunar.js';
 import { parts, weekNumber, weekday, WEEKDAYS } from '../lib/date.js';
 import { sortDay } from '../lib/recurrence.js';
+import { ddayText, targetsInRange, todayCounters } from '../lib/dday.js';
 
 function dayInfo(date, s) {
   const [y] = parts(date);
@@ -20,10 +21,14 @@ function dayInfo(date, s) {
   return { holidays, solarTerm, lunar };
 }
 
-export function CalendarView({ grid, s, today, anchor, byDay, days = {}, editingDate, highlightDate, compact, handlers }) {
+export function CalendarView({ grid, s, today, anchor, byDay, days = {}, countdowns = [], editingDate, highlightDate, compact, handlers }) {
   const names = s.language === 'en' ? (compact ? WEEKDAYS.enShort : WEEKDAYS.en) : (compact ? WEEKDAYS.koShort : WEEKDAYS.ko);
   const anchorMonth = anchor.slice(0, 7);
   const showWeekCol = s.weekNumbers;
+
+  // D-day: labels on target dates, and "D-45(방학), …" on today's cell.
+  const targets = useMemo(() => targetsInRange(countdowns, grid.from, grid.to), [countdowns, grid.from, grid.to]);
+  const counters = useMemo(() => todayCounters(countdowns, today).map((c) => `${ddayText(c.n)}(${c.title})`).join(', '), [countdowns, today]);
 
   const rows = useMemo(() => grid.rows.map((row, r) => row.map((date, c) => {
     const info = dayInfo(date, s);
@@ -67,6 +72,8 @@ export function CalendarView({ grid, s, today, anchor, byDay, days = {}, editing
                 editing={editingDate === date}
                 highlight={highlightDate === date}
                 dayBg={days[date]?.bg || ''}
+                ddays={targets.get(date)}
+                ddayCount={date === today ? counters : ''}
                 dayList={days[date]?.list || ''}
                 compact={compact}
                 {...handlers}

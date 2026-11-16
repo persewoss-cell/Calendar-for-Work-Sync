@@ -8,7 +8,6 @@ contextBridge.exposeInMainWorld('workcalDesktop', {
   toggleMoveResize: () => ipcRenderer.send('toggle-move'),
   setCollapsed: (on) => ipcRenderer.send('set-collapsed', Boolean(on)),
   applySettings: (settings) => ipcRenderer.send('apply-settings', JSON.parse(JSON.stringify(settings))),
-  syncCards: (cards) => ipcRenderer.send('sync-cards', cards),
   openSettings: (tab) => ipcRenderer.send('open-settings', String(tab || 'calendar')),
   previewSettings: (patch) => ipcRenderer.send('settings-preview', JSON.parse(JSON.stringify(patch))),
   onSettingsPreview: (cb) => {

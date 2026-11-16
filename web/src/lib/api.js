@@ -39,10 +39,6 @@ export const api = {
   days: (from, to) => request('GET', `/api/days?from=${from}&to=${to}`),
   setDayStyle: (date, patch) => request('PUT', `/api/days/${date}`, patch),
 
-  notes: () => request('GET', '/api/notes'),
-  createNote: (n) => request('POST', '/api/notes', n),
-  updateNote: (id, n) => request('PATCH', `/api/notes/${id}`, n),
-  deleteNote: (id) => request('DELETE', `/api/notes/${id}`),
 
   countdowns: () => request('GET', '/api/countdowns'),
   createCountdown: (c) => request('POST', '/api/countdowns', c),

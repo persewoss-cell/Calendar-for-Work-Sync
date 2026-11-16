@@ -1,43 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Icon } from './Icon.jsx';
-import { CountdownCard, StickyNote } from './Cards.jsx';
-import { api } from '../lib/api.js';
-import { addDays, parts, weekday, WEEKDAYS } from '../lib/date.js';
-import { expandEvents, sortDay } from '../lib/recurrence.js';
+import { DdayList, RemindersList } from './Panels.jsx';
+import { parts, weekday, WEEKDAYS } from '../lib/date.js';
+import { sortDay } from '../lib/recurrence.js';
+import { ddayText, targetsInRange, todayCounters } from '../lib/dday.js';
 import { holidaysOfYear } from '../lib/holidays.js';
 import { solarTermsOfYear } from '../lib/solarTerms.js';
 import { hexToRgba } from '../lib/settings.js';
 import { sanitizeHtml } from '../../../shared/sanitize.js';
-import { REMINDER_LABEL } from './DayCell.jsx';
 
 // White (or near-white) text set for the dark desktop calendar would vanish on the light phone screen.
 const WHITE = /color:\s*(?:#fff\b|#ffffff\b|white\b|rgb\(\s*25[0-5],\s*25[0-5],\s*25[0-5]\s*\))/gi;
 const forLightTheme = (html) => sanitizeHtml(html).replace(WHITE, 'color: #222').replace(/<font([^>]*) color="(?:#fff|#ffffff|white)"/gi, '<font$1');
 
-function Empty({ kind, text }) {
-  const art = {
-    note: <path d="M44 34h32v40H44zM50 28v10M70 28v10M50 48h8v6h-8zM62 48h8v6h-8zM50 60h8v6h-8z" />,
-    bell: <path d="M60 36a14 14 0 0 1 14 14v12l5 6H41l5-6V50a14 14 0 0 1 14-14zM55 74a5 5 0 0 0 10 0" />,
-    timer: <path d="M60 80a22 22 0 1 0 0-44 22 22 0 0 0 0 44zM60 46v12l8 5M54 30h12" />,
-  }[kind];
-  return (
-    <div className="m-empty">
-      <svg viewBox="0 0 120 100" width="180" height="150" aria-hidden="true">
-        <ellipse cx="60" cy="90" rx="46" ry="5" fill="#eef1f5" />
-        <rect x="18" y="30" width="12" height="12" rx="2" fill="#e8f4fd" transform="rotate(-18 24 36)" />
-        <rect x="88" y="26" width="14" height="10" rx="2" fill="#eef1f5" />
-        <path d="M30 70l3 3-3 3-3-3z" fill="#bfe3fb" />
-        <g fill="#cfeafc" stroke="#7cc8f4" strokeWidth="2.5" strokeLinejoin="round">{art}</g>
-      </svg>
-      <p>{text}</p>
-    </div>
-  );
-}
-
-function MonthView({ s, today, anchor, grid, byDay, days, onStep, onOpenDay }) {
+function MonthView({ s, today, anchor, grid, byDay, days, countdowns, onStep, onOpenDay }) {
   const [, am] = parts(anchor);
   const touch = useRef(null);
   const rows = grid.rows;
+  const targets = useMemo(() => targetsInRange(countdowns, grid.from, grid.to), [countdowns, grid.from, grid.to]);
+  const counters = useMemo(() => todayCounters(countdowns, today), [countdowns, today]);
   const holidaysFor = (date) => {
     const [y] = parts(date);
     if (!s.showHolidays) return [];
@@ -73,12 +54,16 @@ function MonthView({ s, today, anchor, grid, byDay, days, onStep, onOpenDay }) {
             <button
               type="button"
               key={date}
-              className={`m-day ${inMonth ? '' : 'out'} ${date === today ? 'today' : ''}`}
+              className={`m-day ${inMonth ? '' : 'out'} ${date === today ? 'today' : ''} ${isHoliday || wd === 0 ? 'sun' : wd === 6 ? 'sat' : ''}`}
               style={bg ? { background: hexToRgba(bg, 0.35) } : undefined}
               onClick={() => onOpenDay(date)}
             >
               <span className={`m-num ${isHoliday || wd === 0 ? 'red' : wd === 6 ? 'blue' : ''}`}>{Number(date.slice(8))}</span>
               {(hol[0] || term) && <span className={`m-hol ${isHoliday ? 'red' : term && !hol[0] ? 'green' : ''}`}>{hol[0]?.name || term}</span>}
+              {targets.get(date)?.map((c) => <span key={c._id} className="m-hol dday">D-day {c.title}</span>)}
+              {date === today && counters.map((c) => (
+                <span key={c._id} className="m-chip dday" style={{ boxShadow: `inset 3px 0 0 ${c.color || '#4fc3f7'}` }}>{ddayText(c.n)}({c.title})</span>
+              ))}
               {!s.hideTasks && items.map((it) => (
                 <span key={it.key} className={`m-chip ${it.done ? 'done' : ''}`} style={it.color ? { boxShadow: `inset 3px 0 0 ${it.color}` } : undefined}>
                   {it.html ? <span dangerouslySetInnerHTML={{ __html: forLightTheme(it.html) }} /> : it.title}
@@ -92,58 +77,22 @@ function MonthView({ s, today, anchor, grid, byDay, days, onStep, onOpenDay }) {
   );
 }
 
-function RemindersPage({ s, today, version, onOpen }) {
-  const [list, setList] = useState(null);
-  useEffect(() => {
-    const to = addDays(today, 90);
-    api.events(today, to)
-      .then((events) => {
-        const withReminder = events.filter((e) => e.reminder != null);
-        const days = expandEvents(withReminder, today, to);
-        setList([...days.entries()].sort(([a], [b]) => a.localeCompare(b))
-          .flatMap(([day, items]) => items.filter((i) => !i.part || i.part[0] === 1).map((i) => ({ ...i, day }))));
-      })
-      .catch(() => setList([]));
-  }, [today, version]);
-  if (!list) return <div className="m-page-body muted">불러오는 중…</div>;
-  if (!list.length) return <Empty kind="bell" text="알림 없음" />;
-  let lastDay = '';
-  return (
-    <ul className="m-list">
-      {list.map((it) => {
-        const head = it.day !== lastDay ? it.day : null;
-        lastDay = it.day;
-        const [, m, d] = parts(it.day);
-        return (
-          <li key={it.key}>
-            {head && <div className="m-list-day">{m}월 {d}일 {WEEKDAYS.ko[weekday(it.day)]}{it.day === today ? ' · 오늘' : ''}</div>}
-            <button type="button" className="m-list-item" onClick={() => onOpen(it)}>
-              <span className="m-time">{it.startTime || '종일'}</span>
-              <span className="grow">{it.title}</span>
-              <span className="m-remind"><Icon name="bell" size={13} /> {REMINDER_LABEL(it.reminder)}</span>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
 const TABS = [
   { id: 'calendar', label: '달력', icon: 'calendar' },
-  { id: 'notes', label: '메모', icon: 'note' },
   { id: 'reminders', label: '알림', icon: 'bell' },
-  { id: 'countdowns', label: '카운트다운', icon: 'timer' },
+  { id: 'countdowns', label: 'D-day', icon: 'timer' },
   { id: 'me', label: '내 정보', icon: 'user' },
 ];
 
 /** Phone layout: light theme, month grid with item chips, bottom tabs. */
 export function MobileShell({
-  me, s, today, anchor, grid, byDay, days, version, notes, countdowns, noteActions, countdownActions,
+  me, s, today, anchor, grid, byDay, days, version, countdowns, countdownActions,
   onStep, onToday, onOpenDay, onNewEvent, onOpenEvent, actions, online,
 }) {
   const [tab, setTab] = useState(() => {
-    try { return sessionStorage.getItem('mobileTab') || 'calendar'; } catch { return 'calendar'; }
+    let t = 'calendar';
+    try { t = sessionStorage.getItem('mobileTab') || 'calendar'; } catch { /* ignore */ }
+    return TABS.some((x) => x.id === t) ? t : 'calendar';
   });
   const [menu, setMenu] = useState(false);
   const pick = (t) => {
@@ -151,13 +100,10 @@ export function MobileShell({
     try { sessionStorage.setItem('mobileTab', t); } catch { /* ignore */ }
   };
   const [y, m] = parts(anchor);
-  const ordered = useMemo(() => [...notes].reverse(), [notes]);
 
   const fab = {
     calendar: () => onNewEvent(),
-    notes: noteActions.create,
     reminders: () => onNewEvent({ reminder: 10, startTime: '09:00' }),
-    countdowns: countdownActions.create,
   }[tab];
 
   return (
@@ -191,26 +137,15 @@ export function MobileShell({
 
       <main className="m-body">
         {tab === 'calendar' && (
-          <MonthView s={s} today={today} anchor={anchor} grid={grid} byDay={byDay} days={days}
+          <MonthView s={s} today={today} anchor={anchor} grid={grid} byDay={byDay} days={days} countdowns={countdowns}
             onStep={onStep} onOpenDay={onOpenDay} />
         )}
-        {tab === 'notes' && (ordered.length ? (
-          <div className="m-cards">
-            {ordered.map((n) => (
-              <StickyNote key={n._id} note={n} s={s} onChange={(p) => noteActions.update(n._id, p)}
-                onDelete={() => noteActions.remove(n._id)} onHide={() => noteActions.update(n._id, { visible: !n.visible })} />
-            ))}
-          </div>
-        ) : <Empty kind="note" text="메모 없음" />)}
-        {tab === 'reminders' && <RemindersPage s={s} today={today} version={version} onOpen={onOpenEvent} />}
-        {tab === 'countdowns' && (countdowns.length ? (
-          <div className="m-cards">
-            {countdowns.map((c) => (
-              <CountdownCard key={c._id} card={c} s={s} onChange={(p) => countdownActions.update(c._id, p)}
-                onDelete={() => countdownActions.remove(c._id)} onHide={() => countdownActions.update(c._id, { visible: !c.visible })} />
-            ))}
-          </div>
-        ) : <Empty kind="timer" text="카운트다운 일 없음" />)}
+        {tab === 'reminders' && (
+          <div className="m-panel"><RemindersList today={today} version={version} onOpen={onOpenEvent} /></div>
+        )}
+        {tab === 'countdowns' && (
+          <div className="m-panel"><DdayList countdowns={countdowns} today={today} actions={countdownActions} /></div>
+        )}
         {tab === 'me' && (
           <div className="m-me">
             <div className="m-profile">

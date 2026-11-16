@@ -42,6 +42,7 @@ export const DEFAULT_SETTINGS = {
     holiday: { size: 12, color: '#ffb300', bold: false }, // 휴일·기념일 이름
     term: { size: 12, color: '#00c853', bold: false }, // 24절기
     lunar: { size: 10, color: '#ffffff', bold: false }, // 음력
+    dday: { size: 12, color: '#fff59d', bold: true }, // D-day (대상 날짜, 오늘 칸의 D-45)
   },
   // 편집 내용 공통 글꼴 및 크기 — 내가 입력한 일정 글자의 기본 모양
   editFontFamily: 'Dotum',
@@ -53,17 +54,7 @@ export const DEFAULT_SETTINGS = {
   todayBorder: '#fffde7',
   titleButtonColor: '#ffffff',
   opacity: 60,
-  countdownOpacity: 40,
 
-  // 메모
-  noteListStyle: 'bullet',
-  noteOpacity: 20,
-  noteLineSpacing: 2,
-  noteFontFamily: 'Dotum',
-  noteFontSize: 14,
-  noteTextColor: '#4e4b1f',
-  noteTextBackground: true,
-  noteCheckbox: true,
 
   // 고급
   weekStart: 0,
@@ -73,7 +64,6 @@ export const DEFAULT_SETTINGS = {
   shortcuts: {
     hideCalendar: { enabled: false, keys: 'Ctrl+Alt+H' },
     toggleTasks: { enabled: false, keys: 'Ctrl+Alt+F' },
-    toggleNotes: { enabled: false, keys: 'Ctrl+Alt+B' },
     finishEdit: { enabled: false, keys: 'Ctrl+Alt+E' },
   },
   language: 'ko',
@@ -83,7 +73,6 @@ export const DEFAULT_SETTINGS = {
 
   // 메뉴 토글
   hideTasks: false,
-  showNotes: true,
 };
 
 export { FONTS, fontCss } from './fonts.js';
@@ -95,7 +84,7 @@ export function mergeSettings(saved = {}) {
     ...DEFAULT_SETTINGS,
     ...saved,
     calText,
-    shortcuts: { ...DEFAULT_SETTINGS.shortcuts, ...(saved.shortcuts || {}) },
+    shortcuts: Object.fromEntries(Object.keys(DEFAULT_SETTINGS.shortcuts).map((k) => [k, { ...DEFAULT_SETTINGS.shortcuts[k], ...(saved.shortcuts?.[k] || {}) }])),
   };
 }
 
@@ -117,6 +106,7 @@ export function migrateSettings(saved = {}) {
       holiday: { ...base, size: Math.max(size - 1, 10), color: saved.holidayTextColor || '#ffb300' },
       term: { ...base, size: Math.max(size - 1, 10), color: saved.solarTermColor || '#00c853' },
       lunar: { ...base, size: 10 },
+      dday: { ...base, size: Math.max(size - 1, 10), color: '#fff59d', bold: true },
     },
     editFontFamily: saved.fontFamily || 'Dotum',
     editFontSize: size,

@@ -17,7 +17,10 @@ const eventSchema = new mongoose.Schema(
     done: { type: Boolean, default: false },
     doneDates: { type: [String], default: [] }, // completion per occurrence for repeating events
     order: { type: Number, default: 0 },
-    reminder: { type: Number, default: null }, // minutes before start; null => none
+    // Minutes before the start; null => none. All-day items count from 00:00 of the day,
+    // so -540 = 09:00 that day and 180 = 21:00 the day before.
+    reminder: { type: Number, default: null },
+    reminderV: { type: Number, default: 2 }, // 2 = all-day reminders are midnight-based
     rrule: { type: String, default: '' }, // e.g. FREQ=WEEKLY;BYDAY=TU (no DTSTART)
     exdates: { type: [String], default: [] },
 

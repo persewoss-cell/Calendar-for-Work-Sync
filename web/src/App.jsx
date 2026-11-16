@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useData } from './lib/useData.js';
 import { useReminders } from './lib/useReminders.js';
 import { api } from './lib/api.js';
@@ -28,7 +28,6 @@ import { EventDialog } from './components/EventDialog.jsx';
 import { SettingsDialog } from './components/SettingsDialog.jsx';
 import { AccountDialog } from './components/AccountDialog.jsx';
 import { DateDialog, ExportDialog, HelpDialog, MobileDialog, SearchDialog } from './components/SmallDialogs.jsx';
-import { CardsLayer, CardsList, CountdownCard, StickyNote } from './components/Cards.jsx';
 import { DayEditor } from './components/DayEditor.jsx';
 import { MobileShell } from './components/Mobile.jsx';
 import { ensureFonts, fontsInHtml } from './lib/fonts.js';
@@ -95,8 +94,8 @@ export default function App() {
 
   // Web fonts: load the ones chosen in settings and the ones used inside item text.
   useEffect(() => {
-    ensureFonts([s.fontFamily, s.editFontFamily, s.noteFontFamily, ...Object.values(s.calText).map((t) => t.font), ...events.flatMap((e) => fontsInHtml(e.html))]);
-  }, [s.fontFamily, s.editFontFamily, s.noteFontFamily, s.calText, events]);
+    ensureFonts([s.fontFamily, s.editFontFamily, ...Object.values(s.calText).map((t) => t.font), ...events.flatMap((e) => fontsInHtml(e.html))]);
+  }, [s.fontFamily, s.editFontFamily, s.calText, events]);
 
   const flash = useCallback((msg) => {
     setToast(msg);
@@ -212,25 +211,26 @@ export default function App() {
   }), [openEditor, toggleDone, deleteDone, dropItem]);
 
   // ---------- 접기 / 펼치기 ----------
+  // A habitual double-click on the small icon would expand and, with the second click landing on
+  // the 접기 button that appears under the pointer, collapse again. Ignore collapsing right after expanding.
+  const expandedAt = useRef(0);
   const toggleCollapsed = useCallback(() => {
     setCollapsed((c) => {
+      if (!c && Date.now() - expandedAt.current < 600) return c;
+      if (c) expandedAt.current = Date.now();
       try { localStorage.setItem('collapsed', c ? '0' : '1'); } catch { /* ignore */ }
       return !c;
     });
   }, []);
   useEffect(() => { if (me && isDesktop) desktop.setCollapsed?.(collapsed); }, [me, collapsed]);
 
-  // ---------- notes & countdowns ----------
-  const noteActions = {
-    create: () => api.createNote({ title: '', items: [], visible: true }).then((n) => { data.setNotes((l) => [...l, n]); updateSettings({ showNotes: true }); }),
-    update: (id, patch) => { data.setNotes((l) => l.map((n) => (n._id === id ? { ...n, ...patch } : n))); api.updateNote(id, patch); },
-    remove: (id) => { data.setNotes((l) => l.filter((n) => n._id !== id)); api.deleteNote(id); },
-  };
+  // ---------- D-day ----------
   const countdownActions = {
-    create: () => api.createCountdown({ title: '', date: addDays(today, 30), visible: true }).then((c) => { data.setCountdowns((l) => [...l, c]); updateSettings({ showNotes: true }); }),
-    update: (id, patch) => { data.setCountdowns((l) => l.map((c) => (c._id === id ? { ...c, ...patch } : c))); api.updateCountdown(id, patch); },
-    remove: (id) => { data.setCountdowns((l) => l.filter((c) => c._id !== id)); api.deleteCountdown(id); },
+    create: (c) => run(api.createCountdown(c).then((created) => data.setCountdowns((l) => [...l, created]))),
+    update: (id, patch) => { data.setCountdowns((l) => l.map((c) => (c._id === id ? { ...c, ...patch } : c))); run(api.updateCountdown(id, patch)); },
+    remove: (id) => { data.setCountdowns((l) => l.filter((c) => c._id !== id)); run(api.deleteCountdown(id)); },
   };
+
 
   // ---------- once-a-day 자동 연기 ----------
   useEffect(() => {
@@ -247,9 +247,8 @@ export default function App() {
   // ---------- keyboard shortcuts (in-app) ----------
   const shortcutAction = useCallback((name) => {
     if (name === 'toggleTasks') updateSettings({ hideTasks: !s.hideTasks });
-    if (name === 'toggleNotes') updateSettings({ showNotes: !s.showNotes });
     if (name === 'hideCalendar') desktop?.hide();
-  }, [s.hideTasks, s.showNotes, updateSettings]);
+  }, [s.hideTasks, updateSettings]);
 
   useEffect(() => {
     const match = (e, keys) => {
@@ -274,14 +273,8 @@ export default function App() {
   useEffect(() => { if (me && isDesktop) desktop.applySettings(s); }, [me, s]);
   useEffect(() => (isDesktop ? desktop.onShortcut(shortcutAction) : undefined), [shortcutAction]);
   useEffect(() => (desktop?.onSettingsPreview ? desktop.onSettingsPreview(data.previewSettings) : undefined), [data.previewSettings]);
-  useEffect(() => {
-    if (!me || !isDesktop) return;
-    desktop.syncCards({
-      show: s.showNotes,
-      notes: data.notes.filter((n) => n.visible).map((n) => n._id),
-      countdowns: data.countdowns.filter((c) => c.visible).map((c) => c._id),
-    });
-  }, [me, s.showNotes, data.notes, data.countdowns]);
+  // Sticky notes and desktop D-day cards are gone: close any card windows an older PC app still has open.
+  useEffect(() => { if (me && desktop?.syncCards) desktop.syncCards({ show: false, notes: [], countdowns: [] }); }, [me]);
 
   const goTo = (date) => {
     setAnchor(anchorFor(sv, date));
@@ -329,9 +322,8 @@ export default function App() {
   const actions = {
     goToday: () => { setAnchor(null); setHighlight(today); setTimeout(() => setHighlight(null), 1500); },
     step: (dir) => setAnchor(stepAnchor(sv, anchorRaw ?? anchorFor(sv, today), dir)),
-    newNote: noteActions.create,
-    newCountdown: countdownActions.create,
-    toggleNotes: () => updateSettings({ showNotes: !s.showNotes }),
+    openEvent: (item) => setDialog({ type: 'event', item }),
+    newReminder: () => setDialog({ type: 'event', item: { date: today, startTime: '09:00', reminder: 10 } }),
     collapse: toggleCollapsed,
     openMobile: () => setDialog({ type: 'mobile' }),
     openAccount: () => setDialog({ type: 'account' }),
@@ -345,7 +337,6 @@ export default function App() {
     openSettings: () => (desktop?.openSettings ? desktop.openSettings('calendar') : setDialog({ type: 'settings' })),
     openHelp: () => setDialog({ type: 'help' }),
     openAbout: () => (desktop?.openSettings ? desktop.openSettings('about') : setDialog({ type: 'settings', tab: 'about' })),
-    openCards: () => setDialog({ type: 'cards' }),
     quit: () => desktop?.quit(),
     logout,
   };
@@ -353,7 +344,7 @@ export default function App() {
   const main = phone ? (
     <MobileShell
       me={me} s={s} today={today} anchor={anchorRaw ?? anchorFor(sv, today)} grid={realGrid} byDay={byDay} days={data.days}
-      version={events} notes={data.notes} countdowns={data.countdowns} noteActions={noteActions} countdownActions={countdownActions}
+      version={events} countdowns={data.countdowns} countdownActions={countdownActions}
       online={data.online} actions={actions}
       onStep={actions.step} onToday={() => setAnchor(null)}
       onOpenDay={(date) => setEditor({ date, rect: null })}
@@ -366,15 +357,13 @@ export default function App() {
     <div className={phone ? 'app phone' : classes} style={style}>
       {main}
       {!phone && <>
-      <Toolbar s={s} today={today} anchor={anchorRaw ?? anchorFor(sv, today)} actions={actions} />
+      <Toolbar s={s} today={today} anchor={anchorRaw ?? anchorFor(sv, today)} actions={actions}
+        countdowns={data.countdowns} ddayActions={countdownActions} version={events} />
       <CalendarView
         grid={realGrid} s={s} today={today} anchor={anchorRaw ?? anchorFor(sv, today)} byDay={byDay}
-        days={data.days} editingDate={editor?.date} highlightDate={highlight} compact={compact} handlers={handlers}
+        days={data.days} countdowns={data.countdowns} editingDate={editor?.date} highlightDate={highlight} compact={compact} handlers={handlers}
       />
       {!data.online && <div className="offline">서버에 연결할 수 없습니다. 다시 연결 중…</div>}
-      {s.showNotes && !isDesktop && !compact && (
-        <CardsLayer notes={data.notes} countdowns={data.countdowns} s={s} noteActions={noteActions} countdownActions={countdownActions} />
-      )}
       </>}
 
       {editor && (
@@ -425,17 +414,10 @@ export default function App() {
       {dialog?.type === 'search' && <SearchDialog onPick={goTo} onClose={() => setDialog(null)} />}
       {dialog?.type === 'date' && <DateDialog value={today} onPick={goTo} onClose={() => setDialog(null)} />}
       {(dialog?.type === 'export' || dialog?.type === 'import') && (
-        <ExportDialog mode={dialog.type} s={s} onClose={() => setDialog(null)} onImported={() => { data.loadEvents(); data.loadNotes(); data.loadCountdowns(); }} />
+        <ExportDialog mode={dialog.type} s={s} onClose={() => setDialog(null)} onImported={() => { data.loadEvents(); data.loadCountdowns(); }} />
       )}
       {dialog?.type === 'mobile' && <MobileDialog onClose={() => setDialog(null)} />}
       {dialog?.type === 'help' && <HelpDialog onClose={() => setDialog(null)} />}
-      {dialog?.type === 'cards' && (
-        <Modal title="메모 · D-day" onClose={() => setDialog(null)} width={420}>
-          <CardsList notes={data.notes} countdowns={data.countdowns} s={s} noteActions={noteActions} countdownActions={countdownActions} />
-          <CardsLayerInline notes={data.notes} countdowns={data.countdowns} s={s} noteActions={noteActions} countdownActions={countdownActions} />
-        </Modal>
-      )}
-
       <div className="toasts">
         {toast && <div className="toast">{toast}</div>}
         {toasts.map((t) => (
@@ -443,23 +425,6 @@ export default function App() {
             <Icon name="bell" size={16} /> {t.body}
           </div>
         ))}
-      </div>
-    </div>
-  );
-}
-
-function CardsLayerInline({ notes, countdowns, s, noteActions, countdownActions }) {
-  return (
-    <div className="cards-inline">
-      {countdowns.filter((c) => c.visible).map((c) => (
-        <CountdownCard key={c._id} card={c} s={s} onChange={(p) => countdownActions.update(c._id, p)} onDelete={() => countdownActions.remove(c._id)} onHide={() => countdownActions.update(c._id, { visible: false })} />
-      ))}
-      {notes.filter((n) => n.visible).map((n) => (
-        <StickyNote key={n._id} note={n} s={s} onChange={(p) => noteActions.update(n._id, p)} onDelete={() => noteActions.remove(n._id)} onHide={() => noteActions.update(n._id, { visible: false })} />
-      ))}
-      <div className="inline">
-        <button className="btn" onClick={noteActions.create}><Icon name="plus" size={14} /> 메모</button>
-        <button className="btn" onClick={countdownActions.create}><Icon name="plus" size={14} /> D-day</button>
       </div>
     </div>
   );

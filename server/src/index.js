@@ -14,7 +14,6 @@ import { eventsRouter } from './routes/events.js';
 import { accountRouter } from './routes/account.js';
 import { crudRouter } from './routes/crud.js';
 import { daysRouter } from './routes/days.js';
-import { Note } from './models/Note.js';
 import { Countdown } from './models/Countdown.js';
 
 export function createApp() {
@@ -29,7 +28,6 @@ export function createApp() {
   app.use('/api', accountRouter);
   app.use('/api/events', eventsRouter);
   app.use('/api/days', daysRouter);
-  app.use('/api/notes', crudRouter(Note, 'notes', ['title', 'items', 'color', 'visible', 'order']));
   app.use('/api/countdowns', crudRouter(Countdown, 'countdowns', ['title', 'date', 'repeatYearly', 'color', 'visible']));
 
   // Serve the built web/PWA client from the same origin.
@@ -49,8 +47,24 @@ export function createApp() {
   return app;
 }
 
+/**
+ * All-day reminders used to count back from 09:00; they now count from midnight.
+ * Convert old ones once so they keep ringing at the same time.
+ */
+async function migrateReminders() {
+  const { Event } = await import('./models/Event.js');
+  const old = { reminderV: { $exists: false } };
+  const r = await Event.updateMany(
+    { ...old, startTime: null, reminder: { $ne: null } },
+    [{ $set: { reminder: { $subtract: ['$reminder', 540] }, reminderV: 2 } }],
+  );
+  await Event.updateMany(old, { $set: { reminderV: 2 } });
+  if (r.modifiedCount) console.log(`[migrate] converted ${r.modifiedCount} all-day reminders`);
+}
+
 export async function start() {
   await mongoose.connect(config.mongoUri);
+  await migrateReminders();
   const app = createApp();
   const server = http.createServer(app);
   const io = new Server(server, { path: '/socket.io' });

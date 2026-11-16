@@ -3,6 +3,7 @@ import { api } from './api.js';
 import { addDays, nowTimeIn, todayIn } from './date.js';
 import { expandEvents } from './recurrence.js';
 import { playSound } from './sound.js';
+import { reminderDue } from './reminders.js';
 
 const firedKey = 'firedReminders';
 const loadFired = () => { try { return JSON.parse(localStorage.getItem(firedKey) || '{}'); } catch { return {}; } };
@@ -30,13 +31,13 @@ export function useReminders(enabled, s, version) {
       const today = todayIn(s.timezone);
       const nowAbs = toMin(nowTimeIn(s.timezone));
       const fired = loadFired();
+      // Look one day back too: an all-day item tomorrow can ring tonight ("전날 오후 9시").
       const days = expandEvents(eventsRef.current.filter((e) => e.reminder != null), today, addDays(today, 2));
       for (const [day, items] of days) {
         for (const it of items) {
           if (it.part && it.part[0] !== 1) continue;
           if (it.done) continue;
-          const startMin = toMin(it.startTime || '09:00') + (day > today ? 1440 * (day === addDays(today, 1) ? 1 : 2) : 0);
-          const due = startMin - it.reminder;
+          const due = reminderDue(it, day, today);
           const key = `${it._id}:${day}:${it.reminder}`;
           if (nowAbs >= due && nowAbs - due < 15 && !fired[key]) {
             fired[key] = Date.now();

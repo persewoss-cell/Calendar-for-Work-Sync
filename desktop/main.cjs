@@ -13,7 +13,7 @@ let config = {};
 function loadConfig() {
   try { config = JSON.parse(fs.readFileSync(configPath(), 'utf8')); } catch { config = {}; }
   if (!config.serverUrl && process.env.WORKCAL_SERVER) config.serverUrl = process.env.WORKCAL_SERVER;
-  config.cardBounds ||= {};
+  delete config.cardBounds; // sticky notes / D-day card windows were removed
 }
 let saveTimer;
 function saveConfig() {
@@ -33,7 +33,6 @@ let collapsed = false;
 const CHIP = 48; // collapsed window size (px)
 let quitting = false;
 let lastSettings = {};
-const cardWins = new Map(); // key "note:<id>" | "countdown:<id>" → BrowserWindow
 
 const serverOrigin = () => { try { return new URL(config.serverUrl).origin; } catch { return null; } };
 
@@ -66,9 +65,9 @@ function pinToDesktop(win) {
   winDesktop.attachToDesktop(win);
 }
 
-/** All our desktop-layer windows (calendar + sticky notes / D-day cards). */
+/** Our desktop-layer windows. */
 function desktopWindows() {
-  return [mainWin, ...cardWins.values()].filter((w) => w && !w.isDestroyed());
+  return [mainWin].filter((w) => w && !w.isDestroyed());
 }
 
 /** Push every calendar window back under the other programs, unless the user is using one of them. */
@@ -186,61 +185,12 @@ function openSettings(tab = 'calendar') {
   settingsWin.on('closed', () => { settingsWin = null; });
 }
 
-function cardKey(kind, id) { return `${kind}:${id}`; }
-
-function openCard(kind, id, index) {
-  const key = cardKey(kind, id);
-  if (cardWins.has(key)) return;
-  const { workArea } = screen.getPrimaryDisplay();
-  const b = config.cardBounds[key] || {
-    width: 240, height: kind === 'note' ? 220 : 150,
-    x: workArea.x + workArea.width - 270 - Math.floor(index / 4) * 260,
-    y: workArea.y + 30 + (index % 4) * 230,
-  };
-  const win = new BrowserWindow({
-    ...b,
-    frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false,
-    skipTaskbar: true, resizable: true, minimizable: false, maximizable: false, fullscreenable: false,
-    minWidth: 160, minHeight: 100, show: false, icon: ICON,
-    type: process.platform === 'linux' ? 'desktop' : undefined,
-    webPreferences: webPrefs,
-  });
-  lockNavigation(win);
-  win.loadURL(`${config.serverUrl}/#/card/${kind}/${id}`);
-  win.once('ready-to-show', () => {
-    if (mainWin?.isVisible()) win.showInactive();
-    pinToDesktop(win);
-  });
-  win.on('show', () => pinToDesktop(win));
-  win.on('focus', () => winDesktop.sendToBottom(win));
-  const remember = () => { config.cardBounds[key] = win.getBounds(); saveConfig(); };
-  win.on('moved', remember);
-  win.on('resized', remember);
-  win.on('closed', () => cardWins.delete(key));
-  cardWins.set(key, win);
-}
-
-function syncCards({ show, notes = [], countdowns = [] }) {
-  const wanted = new Set();
-  if (show) {
-    countdowns.forEach((id) => wanted.add(cardKey('countdown', id)));
-    notes.forEach((id) => wanted.add(cardKey('note', id)));
-  }
-  for (const [key, win] of cardWins) if (!wanted.has(key)) win.destroy();
-  [...wanted].forEach((key, i) => {
-    const [kind, id] = key.split(':');
-    openCard(kind, id, i);
-  });
-}
-
 function setVisible(visible) {
   if (!mainWin) return;
   if (visible) {
     mainWin.showInactive();
-    cardWins.forEach((w) => w.showInactive());
   } else {
     mainWin.hide();
-    cardWins.forEach((w) => w.hide());
   }
   updateTray();
 }
@@ -408,7 +358,6 @@ ipcMain.on('hide', () => setVisible(false));
 ipcMain.on('toggle-move', () => setMoveMode(!moveMode));
 ipcMain.on('set-collapsed', (_e, on) => setCollapsed(Boolean(on)));
 ipcMain.on('apply-settings', (_e, s) => applySettings(s));
-ipcMain.on('sync-cards', (_e, cards) => syncCards(cards));
 ipcMain.on('open-settings', (_e, tab) => openSettings(tab));
 ipcMain.on('settings-preview', (_e, patch) => mainWin?.webContents.send('settings-preview', patch));
 ipcMain.handle('save-server', async (_e, url) => {

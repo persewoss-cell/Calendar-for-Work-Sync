@@ -4,11 +4,17 @@ import { Icon } from './Icon.jsx';
 import { REPEAT_PRESETS } from '../lib/recurrence.js';
 
 export const COLORS = ['', '#ef5350', '#ff9800', '#fdd835', '#66bb6a', '#26c6da', '#42a5f5', '#7e57c2', '#ec407a', '#8d6e63'];
-const REMINDERS = [
-  { value: '', label: '알림 없음' }, { value: 0, label: '정시' }, { value: 5, label: '5분 전' },
-  { value: 10, label: '10분 전' }, { value: 15, label: '15분 전' }, { value: 30, label: '30분 전' },
-  { value: 60, label: '1시간 전' }, { value: 120, label: '2시간 전' }, { value: 1440, label: '1일 전' },
-];
+import { ALL_DAY_REMINDERS, reminderLabel, TIMED_REMINDERS } from '../lib/reminders.js';
+
+/** Reminder choices: clock times for all-day items, "N분 전" for timed ones (+ the current value if unusual). */
+function reminderOptions(allDay, current) {
+  const list = allDay ? ALL_DAY_REMINDERS : TIMED_REMINDERS;
+  const opts = [{ value: '', label: '알림 없음' }, ...list];
+  if (current !== '' && current != null && !list.some((o) => o.value === current)) {
+    opts.push({ value: current, label: reminderLabel({ startTime: allDay ? null : '00:00', reminder: current }) });
+  }
+  return opts;
+}
 
 export function EventDialog({ item, onSave, onDelete, onClose }) {
   const isNew = !item._id;
@@ -74,7 +80,10 @@ export function EventDialog({ item, onSave, onDelete, onClose }) {
           <input type="date" className="input" value={f.endDate} min={f.date} onChange={set('endDate')} />
           <label>시간</label>
           <div className="inline">
-            <label className="check"><input type="checkbox" checked={f.allDay} onChange={set('allDay')} /> 종일</label>
+            <label className="check"><input type="checkbox" checked={f.allDay} onChange={(e) => {
+              const allDay = e.target.checked;
+              setF((p) => ({ ...p, allDay, reminder: p.reminder === '' ? '' : allDay ? -540 : 10 }));
+            }} /> 종일</label>
             {!f.allDay && (
               <>
                 <input type="time" className="input" value={f.startTime} onChange={set('startTime')} />
@@ -85,7 +94,7 @@ export function EventDialog({ item, onSave, onDelete, onClose }) {
           </div>
           <label>알림</label>
           <select className="select" value={String(f.reminder)} onChange={(e) => set('reminder')(e.target.value === '' ? '' : Number(e.target.value))}>
-            {REMINDERS.map((r) => <option key={String(r.value)} value={String(r.value)}>{r.label}</option>)}
+            {reminderOptions(f.allDay, f.reminder).map((r) => <option key={String(r.value)} value={String(r.value)}>{r.label}</option>)}
           </select>
           <label>반복</label>
           <div className="inline">

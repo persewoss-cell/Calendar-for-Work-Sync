@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon.jsx';
 import { isDesktop } from '../lib/desktop.js';
 import { WEEKDAYS, parts, weekday } from '../lib/date.js';
+import { DdayList, RemindersList } from './Panels.jsx';
 
 function useOutside(open, close) {
   const ref = useRef(null);
@@ -14,15 +15,19 @@ function useOutside(open, close) {
   return ref;
 }
 
-function Dropdown({ icon, title, children, badge, color }) {
+function Dropdown({ icon, title, children, badge, color, panel }) {
   const [open, setOpen] = useState(false);
-  const ref = useOutside(open, () => setOpen(false));
+  const close = () => setOpen(false);
+  const ref = useOutside(open, close);
   return (
     <div className="dropdown" ref={ref}>
-      <button className="icon-btn" style={{ color }} title={title} aria-label={title} onClick={() => setOpen((o) => !o)}>
+      <button className={`icon-btn ${open ? 'pressed' : ''}`} style={{ color }} title={title} aria-label={title} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <Icon name={icon} size={19} />{badge && <span className="badge-dot" />}
       </button>
-      {open && <div className="menu" onClick={() => setOpen(false)}>{children}</div>}
+      {open && (panel
+        // A panel stays open while it is used; it closes on an outside click.
+        ? <div className="menu panel" role="dialog" aria-label={title}><div className="panel-title">{title}</div>{typeof children === 'function' ? children(close) : children}</div>
+        : <div className="menu" onClick={close}>{children}</div>)}
     </div>
   );
 }
@@ -35,7 +40,7 @@ const Item = ({ icon, children, onClick, right, disabled }) => (
   </button>
 );
 
-export function Toolbar({ s, today, anchor, actions }) {
+export function Toolbar({ s, today, anchor, actions, countdowns, ddayActions, version }) {
   const [y, m, d] = parts(today);
   const wd = (s.language === 'en' ? WEEKDAYS.en : WEEKDAYS.ko)[weekday(today)];
   const title = s.language === 'en' ? `Today is ${wd}, ${today}` : `오늘은 ${y}년${m}월${d}일 ${wd}`;
@@ -58,12 +63,16 @@ export function Toolbar({ s, today, anchor, actions }) {
       </div>
       <button className="tb-title" onClick={actions.goToday} title="오늘로 이동">{title}</button>
       <div className="tb-right" style={{ color }}>
-        <Dropdown icon="puzzle" title="메모 · D-day" color={color}>
-          <Item icon="note" onClick={actions.newNote}>새 스티커 메모</Item>
-          <Item icon="timer" onClick={actions.newCountdown}>새 D-day 카드</Item>
-          <Item icon={s.showNotes ? 'eyeOff' : 'eye'} onClick={actions.toggleNotes}>{s.showNotes ? '메모·카드 숨기기' : '메모·카드 보이기'}</Item>
+        <Dropdown icon="bell" title="알림" color={color} panel>
+          {(close) => (
+            <RemindersList today={today} version={version}
+              onOpen={(it) => { close(); actions.openEvent(it); }}
+              onNew={() => { close(); actions.newReminder(); }} />
+          )}
         </Dropdown>
-        <button className="icon-btn" style={{ color }} title="모바일 연결" aria-label="모바일 연결" onClick={actions.openMobile}><Icon name="phone" size={19} /></button>
+        <Dropdown icon="timer" title="D-day" color={color} panel>
+          <DdayList countdowns={countdowns} today={today} actions={ddayActions} />
+        </Dropdown>
         <button className="icon-btn" style={{ color }} title="계정 설정" aria-label="계정 설정" onClick={actions.openAccount}>
           <Icon name="user" size={19} />
         </button>
@@ -86,6 +95,7 @@ export function Toolbar({ s, today, anchor, actions }) {
           <Item icon="settings" onClick={actions.openSettings}>캘린더 설정</Item>
           <Item icon="account" onClick={actions.openAccount}>계정 설정</Item>
           <hr />
+          <Item icon="phone" onClick={actions.openMobile}>휴대폰 연결 (QR)</Item>
           <Item icon="bulb" onClick={actions.openHelp}>기능 소개</Item>
           <Item onClick={actions.openAbout}>제품 정보</Item>
           <hr />

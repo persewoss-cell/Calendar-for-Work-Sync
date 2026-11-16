@@ -1,10 +1,10 @@
 import { memo, useState } from 'react';
 import { Icon } from './Icon.jsx';
 import { hexToRgba } from '../lib/settings.js';
+import { reminderLabel } from '../lib/reminders.js';
 import { daysInMonth, parts, weekday } from '../lib/date.js';
 import { sanitizeHtml } from '../../../shared/sanitize.js';
 
-const REMINDER_LABEL = (min) => (min === 0 ? '정시' : min < 60 ? `${min}분 전` : min < 1440 ? `${min / 60}시간 전` : `${min / 1440}일 전`);
 
 function ItemRow({ item, index, s, listStyle, onToggle, onDelete, onDragStart }) {
   const marker = listStyle === 'number' ? `${index + 1}.` : listStyle === 'bullet' ? '•' : '';
@@ -31,7 +31,7 @@ function ItemRow({ item, index, s, listStyle, onToggle, onDelete, onDragStart })
       </span>
       {item.done && s.showDoneIcon && <Icon name="check" size={12} className="done-icon" />}
       {s.showReminderTime && item.reminder != null && (
-        <span className="item-reminder" title={`알림: ${REMINDER_LABEL(item.reminder)}`}><Icon name="bell" size={10} /></span>
+        <span className="item-reminder" title={`알림: ${reminderLabel(item)}`}><Icon name="bell" size={10} /></span>
       )}
       {item.rrule && <Icon name="repeat" size={10} className="item-flag" />}
       {item.done && onDelete && (
@@ -45,7 +45,7 @@ function ItemRow({ item, index, s, listStyle, onToggle, onDelete, onDragStart })
 }
 
 function DayCellImpl({
-  date, today, s, items, info, inMonth, restKind, editing, highlight, monthLabel, weekNo, dayBg, dayList,
+  date, today, s, items, info, inMonth, restKind, editing, highlight, monthLabel, weekNo, dayBg, dayList, ddays, ddayCount,
   onOpenEditor, onToggle, onDelete, onDropItem, compact,
 }) {
   const [dragOver, setDragOver] = useState(false);
@@ -104,6 +104,8 @@ function DayCellImpl({
           <span key={h.name} className={`hol ${h.type}`}>{h.name}</span>
         ))}
         {info.solarTerm && <span className="term">{info.solarTerm}</span>}
+        {ddays?.map((c) => <span key={c._id} className="dday-label" title={`D-day: ${c.title}`}>D-day {c.title}</span>)}
+        {ddayCount && <span className="dday-count" title="D-day">{ddayCount}</span>}
         <span className="spacer" />
         {weekNo != null && <span className="week-no">{weekNo}주</span>}
         {info.lunar && <span className="lunar">{info.lunar}</span>}
@@ -125,4 +127,3 @@ function DayCellImpl({
 }
 
 export const DayCell = memo(DayCellImpl);
-export { REMINDER_LABEL };

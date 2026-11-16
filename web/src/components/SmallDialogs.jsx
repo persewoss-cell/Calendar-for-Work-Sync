@@ -60,8 +60,8 @@ export function ExportDialog({ mode, s, onClose, onImported }) {
     setStatus('내보내는 중…');
     const events = await api.exportEvents();
     if (fmt === 'json') {
-      const [notes, countdowns] = await Promise.all([api.notes(), api.countdowns()]);
-      download(`calendar-backup-${stamp}.json`, JSON.stringify({ version: 1, exportedAt: new Date(), settings: s, events, notes, countdowns }, null, 2), 'application/json');
+      const countdowns = await api.countdowns();
+      download(`calendar-backup-${stamp}.json`, JSON.stringify({ version: 2, exportedAt: new Date(), settings: s, events, countdowns }, null, 2), 'application/json');
     } else if (fmt === 'ics') {
       download(`calendar-${stamp}.ics`, toICS(events, s.timezone), 'text/calendar');
     } else {
@@ -124,9 +124,8 @@ export function ExportDialog({ mode, s, onClose, onImported }) {
       } else {
         const data = JSON.parse(text);
         events = data.events || [];
-        for (const n of data.notes || []) await api.createNote({ title: n.title, items: n.items, color: n.color, visible: n.visible });
         for (const c of data.countdowns || []) await api.createCountdown({ title: c.title, date: c.date, repeatYearly: c.repeatYearly, color: c.color });
-        extra = `, 메모 ${(data.notes || []).length}개, D-day ${(data.countdowns || []).length}개`;
+        extra = `, D-day ${(data.countdowns || []).length}개`;
       }
       const cleaned = events.map(({ _id, userId, createdAt, updatedAt, ...e }) => e);
       const r = await api.bulkCreate(cleaned);
@@ -141,7 +140,7 @@ export function ExportDialog({ mode, s, onClose, onImported }) {
     <Modal title={mode === 'export' ? '내보내기' : '불러오기'} onClose={onClose} width={440}>
       {mode === 'export' ? (
         <div className="export-grid">
-          <button className="big-btn" onClick={() => doExport('json')}><Icon name="download" /> 전체 백업 (JSON)<small>일정·메모·D-day·설정</small></button>
+          <button className="big-btn" onClick={() => doExport('json')}><Icon name="download" /> 전체 백업 (JSON)<small>일정·D-day·설정</small></button>
           <button className="big-btn" onClick={() => doExport('ics')}><Icon name="calendar" /> iCalendar (.ics)<small>다른 캘린더 앱(구글·아웃룩 등)에서 열기</small></button>
           <button className="big-btn" onClick={() => doExport('csv')}><Icon name="note" /> 엑셀용 (CSV)</button>
         </div>
@@ -215,8 +214,8 @@ export function HelpDialog({ onClose }) {
     ['끌어서 옮기기', '일정을 다른 날짜로 끌어 놓으면 날짜가 바뀝니다.'],
     ['체크박스·완료', '체크하면 완료 처리되고 설정에 따라 맨 아래로 내려갑니다. 완료한 일정 오른쪽 끝의 휴지통을 누르면 물어본 뒤 삭제합니다. 미완료 자동 연기도 켤 수 있습니다.'],
     ['공휴일·24절기·음력', '대한민국 공휴일과 대체공휴일, 24절기, 음력 날짜를 표시합니다.'],
-    ['스티커 메모·D-day 카드', '퍼즐 아이콘에서 메모와 D-day 카드를 만듭니다. PC 앱에서는 바탕화면에 따로 붙습니다.'],
-    ['알림', '알림을 설정한 일정은 시간이 되면 알림창과 소리로 알려줍니다.'],
+    ['D-day', '제목 줄의 타이머 아이콘(휴대폰은 D-day 탭)에서 D-day를 만듭니다. 대상 날짜 칸에 「D-day 방학」이 표시되고, 눈 아이콘을 켜 둔 D-day는 오늘 칸에 「D-45(방학)」처럼 남은 날이 나옵니다. 날짜가 지나면 사라집니다.'],
+    ['알림', '알림을 설정한 일정은 시간이 되면 알림창과 소리로 알려줍니다. 종일 일정은 「당일 오전 9시」, 「전날 오후 9시」처럼 울릴 시각을 고릅니다. 제목 줄의 종 아이콘(휴대폰은 알림 탭)에서 다가오는 알림을 볼 수 있습니다.'],
     ['PC ↔ 모바일 동기화', '같은 아이디로 로그인한 모든 기기에 즉시 반영됩니다.'],
     ['내보내기·불러오기·프린트', '메뉴에서 백업(JSON), iCalendar, CSV로 내보내고 불러오거나 인쇄할 수 있습니다.'],
   ];

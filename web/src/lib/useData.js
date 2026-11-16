@@ -9,7 +9,6 @@ export function useData(range) {
   const [settings, setSettings] = useState(mergeSettings());
   const [events, setEvents] = useState([]);
   const [days, setDays] = useState({}); // date → { bg, list } (cell color, list style)
-  const [notes, setNotes] = useState([]);
   const [countdowns, setCountdowns] = useState([]);
   const [online, setOnline] = useState(true);
   const rangeRef = useRef(range);
@@ -32,7 +31,6 @@ export function useData(range) {
       setDays(Object.fromEntries(list.map((d) => [d.date, { bg: d.bg || '', list: d.list || '' }])));
     } catch { /* ignore */ }
   }, []);
-  const loadNotes = useCallback(() => api.notes().then(setNotes).catch(() => {}), []);
   const loadCountdowns = useCallback(() => api.countdowns().then(setCountdowns).catch(() => {}), []);
   const loadMe = useCallback(async () => {
     try {
@@ -54,7 +52,7 @@ export function useData(range) {
 
   useEffect(() => { loadMe(); }, [loadMe]);
   useEffect(() => { if (me) { loadEvents(); loadDays(); } }, [me, range.from, range.to, loadEvents, loadDays]);
-  useEffect(() => { if (me) { loadNotes(); loadCountdowns(); } }, [me, loadNotes, loadCountdowns]);
+  useEffect(() => { if (me) loadCountdowns(); }, [me, loadCountdowns]);
 
   useEffect(() => {
     if (!me) return undefined;
@@ -66,7 +64,6 @@ export function useData(range) {
     socket.on('changed', ({ kind }) => {
       if (kind === 'events') debounce('events', loadEvents);
       if (kind === 'days') debounce('days', loadDays);
-      if (kind === 'notes') debounce('notes', loadNotes);
       if (kind === 'countdowns') debounce('countdowns', loadCountdowns);
       if (kind === 'settings') debounce('settings', loadMe);
     });
@@ -76,7 +73,7 @@ export function useData(range) {
       socket.close();
       window.removeEventListener('focus', onFocus);
     };
-  }, [me, loadEvents, loadDays, loadNotes, loadCountdowns, loadMe]);
+  }, [me, loadEvents, loadDays, loadCountdowns, loadMe]);
 
   const updateSettings = useCallback((patch) => {
     setSettings((cur) => mergeSettings({ ...cur, ...patch }));
@@ -94,7 +91,7 @@ export function useData(range) {
 
   return {
     me, setMe, loadMe, settings, updateSettings, previewSettings, events, setEvents, loadEvents, days, setDays,
-    notes, setNotes, loadNotes, countdowns, setCountdowns, loadCountdowns,
+    countdowns, setCountdowns, loadCountdowns,
     online,
   };
 }

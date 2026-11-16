@@ -15,7 +15,6 @@ const TABS = [
   { id: 'calendar', label: '캘린더', icon: 'calendar' },
   { id: 'cell', label: '셀', icon: 'note' },
   { id: 'font', label: '글꼴 및 색상', icon: 'settings' },
-  { id: 'memo', label: '메모', icon: 'note' },
   { id: 'advanced', label: '고급', icon: 'move' },
   { id: 'about', label: '제품 정보', icon: 'info' },
 ];
@@ -110,6 +109,7 @@ const CAL_TEXT = [
   ['holiday', '휴일·기념일 이름', 8, 24],
   ['term', '24절기', 8, 24],
   ['lunar', '음력', 8, 20],
+  ['dday', 'D-day', 8, 24],
 ];
 
 /** One row of the calendar text table: font · size · color · bold. */
@@ -317,27 +317,6 @@ export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', on
                 <Section title="투명도">
                   <Row label="투명도"><Select value={s.opacity} onChange={set('opacity')} options={percent(0, 90, 10)} /></Row>
                   <Row label="유리 효과"><Toggle checked={s.glass} onChange={set('glass')} /></Row>
-                  <Row label="카운트다운 카드 투명도"><Select value={s.countdownOpacity} onChange={set('countdownOpacity')} options={percent(0, 90, 10)} /></Row>
-                </Section>
-              </>
-            )}
-
-            {tab === 'memo' && (
-              <>
-                <Section title="노트 표시">
-                  <ListStylePicker value={s.noteListStyle} onChange={set('noteListStyle')} />
-                  <Row label="메모 투명도"><Select value={s.noteOpacity} onChange={set('noteOpacity')} options={percent(0, 90, 10)} /></Row>
-                  <Row label="줄 간격"><Select value={s.noteLineSpacing} onChange={set('noteLineSpacing')} options={range(0, 6)} /></Row>
-                  <Row label="편집 내용의 글꼴 크기 및 색상">
-                    <FontSelect value={s.noteFontFamily} onChange={set('noteFontFamily')} />
-                    <Select value={s.noteFontSize} onChange={set('noteFontSize')} options={range(10, 22, (n) => `${n}px`)} />
-                    <ColorInput value={s.noteTextColor} onChange={set('noteTextColor')} />
-                  </Row>
-                  <Row label="텍스트 배경 표시"><Toggle checked={s.noteTextBackground} onChange={set('noteTextBackground')} /></Row>
-                  <Row label="체크박스 표시"><Toggle checked={s.noteCheckbox} onChange={set('noteCheckbox')} /></Row>
-                </Section>
-                <Section title="노트 관리">
-                  <Row label="스티커 메모 보이기"><Toggle checked={s.showNotes} onChange={set('showNotes')} /></Row>
                 </Section>
               </>
             )}
@@ -368,7 +347,6 @@ export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', on
                 <Section title="단축키">
                   <ShortcutRow label="캘린더 숨기기 단축키" value={s.shortcuts.hideCalendar} onChange={setShortcut('hideCalendar')} />
                   <ShortcutRow label="예약된 작업 단축키 표시 및 숨기기" value={s.shortcuts.toggleTasks} onChange={setShortcut('toggleTasks')} />
-                  <ShortcutRow label="스티커 메모 표시/숨기기 단축키" value={s.shortcuts.toggleNotes} onChange={setShortcut('toggleNotes')} />
                   <ShortcutRow label="편집 완료 단축키" value={s.shortcuts.finishEdit} onChange={setShortcut('finishEdit')} />
                 </Section>
                 <Section title="소프트웨어 설정">
