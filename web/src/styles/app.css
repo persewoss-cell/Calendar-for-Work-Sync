@@ -518,7 +518,7 @@ body.phone-body { background: #fff; color: #222; }
   border: 0; color: #fff; background: linear-gradient(135deg, #4fc3f7, #1e9bf0); box-shadow: 0 8px 20px rgba(30, 155, 240, .45);
   display: grid; place-items: center; z-index: 30;
 }
-.m-tabs { display: grid; grid-template-columns: repeat(5, 1fr); background: #fff; border-top: 1px solid #eef0f3; padding: 6px 0 calc(6px + env(safe-area-inset-bottom)); }
+.m-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); background: #fff; border-top: 1px solid #eef0f3; padding: 6px 0 calc(6px + env(safe-area-inset-bottom)); }
 .m-tabs button { background: none; border: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #b5bcc5; font-size: 10.5px; padding: 2px 0; }
 .m-tabs button.on { color: #1e9bf0; }
 
@@ -615,3 +615,14 @@ body.settings-window-body { background: #d4d9e0; }
 .dday-confirm { position: absolute; inset: 0; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 8px; background: #fff3f3; border: 1px solid #f5c2c2; font-size: 13px; }
 .dday-confirm span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .btn.danger-fill { background: #e53935; border-color: #e53935; color: #fff; }
+
+/* phone header must fit narrow screens (no sideways scroll that shifts the tabs) */
+.mobile { overflow-x: hidden; }
+.m-head { min-width: 0; padding-left: 14px; padding-right: 8px; }
+.m-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: clip; }
+.m-head-actions { flex: none; gap: 0; }
+@media (max-width: 360px) {
+  .m-title { font-size: 17px; }
+  .m-head-actions > button { width: 30px; }
+  .m-head-actions .m-today { padding: 0 7px; font-size: 12px; }
+}
