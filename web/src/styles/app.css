@@ -597,3 +597,6 @@ body.settings-window-body { background: #d4d9e0; }
 .m-panel { padding: 6px 14px 110px; }
 .m-panel .dday-list, .m-panel .remind-list { font-size: 15px; }
 .m-panel .dday-row { background: #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, .05); padding: 12px; }
+
+.allday-remind .input[type=time] { width: 120px; }
+.allday-remind .input[type=date] { width: 150px; }

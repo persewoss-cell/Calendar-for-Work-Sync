@@ -60,6 +60,11 @@ async function migrateReminders() {
   );
   await Event.updateMany(old, { $set: { reminderV: 2 } });
   if (r.modifiedCount) console.log(`[migrate] converted ${r.modifiedCount} all-day reminders`);
+
+  // `visible` used to hide a desktop card; it now means "show on today's cell". Start with the eye on.
+  const { Countdown } = await import('./models/Countdown.js');
+  const c = await Countdown.updateMany({ ddayV: { $exists: false } }, { $set: { visible: true, ddayV: 2 } });
+  if (c.modifiedCount) console.log(`[migrate] switched on ${c.modifiedCount} D-day eyes`);
 }
 
 export async function start() {

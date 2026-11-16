@@ -322,8 +322,8 @@ export default function App() {
   const actions = {
     goToday: () => { setAnchor(null); setHighlight(today); setTimeout(() => setHighlight(null), 1500); },
     step: (dir) => setAnchor(stepAnchor(sv, anchorRaw ?? anchorFor(sv, today), dir)),
-    openEvent: (item) => setDialog({ type: 'event', item }),
-    newReminder: () => setDialog({ type: 'event', item: { date: today, startTime: '09:00', reminder: 10 } }),
+    openEvent: (item) => setDialog({ type: 'event', item, alarm: true }),
+    newReminder: () => setDialog({ type: 'event', item: { date: today, startTime: '09:00', reminder: 10 }, alarm: true }),
     collapse: toggleCollapsed,
     openMobile: () => setDialog({ type: 'mobile' }),
     openAccount: () => setDialog({ type: 'account' }),
@@ -348,8 +348,8 @@ export default function App() {
       online={data.online} actions={actions}
       onStep={actions.step} onToday={() => setAnchor(null)}
       onOpenDay={(date) => setEditor({ date, rect: null })}
-      onNewEvent={(extra) => setDialog({ type: 'event', item: { date: today, ...extra } })}
-      onOpenEvent={(item) => setDialog({ type: 'event', item })}
+      onNewEvent={(extra) => setDialog({ type: 'event', item: { date: today, ...extra }, alarm: Boolean(extra?.reminder != null) })}
+      onOpenEvent={(item) => setDialog({ type: 'event', item, alarm: true })}
     />
   ) : null;
 
@@ -394,6 +394,7 @@ export default function App() {
       {dialog?.type === 'event' && (
         <EventDialog
           item={dialog.item}
+          alarm={Boolean(dialog.alarm)}
           onClose={() => setDialog(null)}
           onSave={(patch) => {
             // A plain-text title edit replaces the formatted text.

@@ -6,6 +6,8 @@ import { playSound } from './sound.js';
 import { reminderDue } from './reminders.js';
 
 const firedKey = 'firedReminders';
+// Reminders can be set days ahead ("일주일 전", or any date), so look this far into the future.
+const LOOKAHEAD_DAYS = 366;
 const loadFired = () => { try { return JSON.parse(localStorage.getItem(firedKey) || '{}'); } catch { return {}; } };
 const saveFired = (v) => { try { localStorage.setItem(firedKey, JSON.stringify(v)); } catch { /* ignore */ } };
 const toMin = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
@@ -18,7 +20,9 @@ export function useReminders(enabled, s, version) {
   useEffect(() => {
     if (!enabled) return undefined;
     const today = todayIn(s.timezone);
-    const load = () => api.events(today, addDays(today, 2)).then((ev) => { eventsRef.current = ev; }).catch(() => {});
+    const load = () => api.events(today, addDays(today, LOOKAHEAD_DAYS))
+      .then((ev) => { eventsRef.current = ev.filter((e) => e.reminder != null); })
+      .catch(() => {});
     load();
     const t = setInterval(load, 5 * 60 * 1000);
     return () => clearInterval(t);
@@ -31,8 +35,7 @@ export function useReminders(enabled, s, version) {
       const today = todayIn(s.timezone);
       const nowAbs = toMin(nowTimeIn(s.timezone));
       const fired = loadFired();
-      // Look one day back too: an all-day item tomorrow can ring tonight ("전날 오후 9시").
-      const days = expandEvents(eventsRef.current.filter((e) => e.reminder != null), today, addDays(today, 2));
+      const days = expandEvents(eventsRef.current, today, addDays(today, LOOKAHEAD_DAYS));
       for (const [day, items] of days) {
         for (const it of items) {
           if (it.part && it.part[0] !== 1) continue;

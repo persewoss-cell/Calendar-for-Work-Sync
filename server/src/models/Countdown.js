@@ -8,7 +8,8 @@ const countdownSchema = new mongoose.Schema(
     date: { type: String, required: true },
     repeatYearly: { type: Boolean, default: false },
     color: { type: String, default: '#4fc3f7' },
-    visible: { type: Boolean, default: true },
+    visible: { type: Boolean, default: true }, // show "D-45(방학)" on today's cell (the eye)
+    ddayV: { type: Number, default: 2 }, // 2 = `visible` means the eye above, not the old desktop card
   },
   { timestamps: true },
 );

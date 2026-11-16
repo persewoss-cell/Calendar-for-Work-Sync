@@ -2,21 +2,52 @@ import { useState } from 'react';
 import { Modal } from './Modal.jsx';
 import { Icon } from './Icon.jsx';
 import { REPEAT_PRESETS } from '../lib/recurrence.js';
+import { ALL_DAY_DAYS, joinAllDay, reminderLabel, splitAllDay, TIMED_REMINDERS } from '../lib/reminders.js';
+import { addDays, diffDays } from '../lib/date.js';
 
 export const COLORS = ['', '#ef5350', '#ff9800', '#fdd835', '#66bb6a', '#26c6da', '#42a5f5', '#7e57c2', '#ec407a', '#8d6e63'];
-import { ALL_DAY_REMINDERS, reminderLabel, TIMED_REMINDERS } from '../lib/reminders.js';
 
-/** Reminder choices: clock times for all-day items, "N분 전" for timed ones (+ the current value if unusual). */
-function reminderOptions(allDay, current) {
-  const list = allDay ? ALL_DAY_REMINDERS : TIMED_REMINDERS;
-  const opts = [{ value: '', label: '알림 없음' }, ...list];
-  if (current !== '' && current != null && !list.some((o) => o.value === current)) {
-    opts.push({ value: current, label: reminderLabel({ startTime: allDay ? null : '00:00', reminder: current }) });
+/** Timed items: "N분 전" choices (+ the current value if unusual). */
+function timedOptions(current) {
+  const opts = [{ value: '', label: '알림 없음' }, ...TIMED_REMINDERS];
+  if (current !== '' && current != null && !TIMED_REMINDERS.some((o) => o.value === current)) {
+    opts.push({ value: current, label: reminderLabel({ startTime: '00:00', reminder: current }) });
   }
   return opts;
 }
 
-export function EventDialog({ item, onSave, onDelete, onClose }) {
+/** All-day items: [시각] + [당일 / 전일 / 3일 전 / 일주일 전 / 직접 날짜 지정] (+ a date when custom). */
+function AllDayReminder({ date, value, onChange }) {
+  const has = value !== '' && value != null;
+  const { daysBefore, time } = has ? splitAllDay(value) : { daysBefore: 0, time: '09:00' };
+  const preset = ALL_DAY_DAYS.some((d) => d.value === daysBefore);
+  const [custom, setCustom] = useState(has && !preset);
+  const kind = !has ? '' : custom ? 'custom' : String(daysBefore);
+  const customDate = addDays(date, -daysBefore);
+  return (
+    <div className="inline allday-remind">
+      <input type="time" className="input" value={time} disabled={!has} aria-label="알림 시각"
+        onChange={(e) => e.target.value && onChange(joinAllDay(daysBefore, e.target.value))} />
+      <select className="select" value={kind} aria-label="알림 날짜" onChange={(e) => {
+        const v = e.target.value;
+        if (v === '') { setCustom(false); onChange(''); return; }
+        if (v === 'custom') { setCustom(true); onChange(joinAllDay(daysBefore, time)); return; }
+        setCustom(false);
+        onChange(joinAllDay(Number(v), time));
+      }}>
+        <option value="">알림 없음</option>
+        {ALL_DAY_DAYS.map((d) => <option key={d.value} value={String(d.value)}>{d.label}</option>)}
+        <option value="custom">직접 날짜 지정</option>
+      </select>
+      {kind === 'custom' && (
+        <input type="date" className="input" value={customDate} max={date} aria-label="알림 날짜 지정"
+          onChange={(e) => e.target.value && onChange(joinAllDay(diffDays(e.target.value, date), time))} />
+      )}
+    </div>
+  );
+}
+
+export function EventDialog({ item, onSave, onDelete, onClose, alarm = false }) {
   const isNew = !item._id;
   const [f, setF] = useState({
     title: item.title || '',
@@ -52,7 +83,7 @@ export function EventDialog({ item, onSave, onDelete, onClose }) {
 
   return (
     <Modal
-      title={isNew ? '새 일정' : '일정 편집'}
+      title={alarm ? (isNew ? '새 알람' : '알람 편집') : (isNew ? '새 일정' : '일정 편집')}
       onClose={onClose}
       width={460}
       footer={(
@@ -93,9 +124,13 @@ export function EventDialog({ item, onSave, onDelete, onClose }) {
             )}
           </div>
           <label>알림</label>
-          <select className="select" value={String(f.reminder)} onChange={(e) => set('reminder')(e.target.value === '' ? '' : Number(e.target.value))}>
-            {reminderOptions(f.allDay, f.reminder).map((r) => <option key={String(r.value)} value={String(r.value)}>{r.label}</option>)}
-          </select>
+          {f.allDay ? (
+            <AllDayReminder key={`${f.date}`} date={f.date} value={f.reminder} onChange={set('reminder')} />
+          ) : (
+            <select className="select" value={String(f.reminder)} onChange={(e) => set('reminder')(e.target.value === '' ? '' : Number(e.target.value))}>
+              {timedOptions(f.reminder).map((r) => <option key={String(r.value)} value={String(r.value)}>{r.label}</option>)}
+            </select>
+          )}
           <label>반복</label>
           <div className="inline">
             <select className="select" value={presetKnown ? f.rrule : '__custom'} onChange={(e) => e.target.value !== '__custom' && set('rrule')(e.target.value)}>
