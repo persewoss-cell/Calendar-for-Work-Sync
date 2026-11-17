@@ -6,13 +6,15 @@ const fs = require('node:fs');
 const winDesktop = require('./winDesktop.cjs');
 
 const ICON = path.join(__dirname, 'build', 'icon.png');
+// The calendar server. Used automatically on first run; 서버 주소 변경 in the tray can still change it.
+const DEFAULT_SERVER = 'https://workcal-jrwm.onrender.com';
 
 // ---------- small JSON config in the user data folder ----------
 const configPath = () => path.join(app.getPath('userData'), 'config.json');
 let config = {};
 function loadConfig() {
   try { config = JSON.parse(fs.readFileSync(configPath(), 'utf8')); } catch { config = {}; }
-  if (!config.serverUrl && process.env.WORKCAL_SERVER) config.serverUrl = process.env.WORKCAL_SERVER;
+  if (!config.serverUrl) config.serverUrl = process.env.WORKCAL_SERVER || DEFAULT_SERVER;
   delete config.cardBounds; // sticky notes / D-day card windows were removed
 }
 let saveTimer;
@@ -29,6 +31,7 @@ let setupWin = null;
 let settingsWin = null;
 let tray = null;
 let moveMode = false;
+let loginMode = false; // the login screen is showing: a normal, opaque, front window with a taskbar button
 let collapsed = false;
 const CHIP = 48; // collapsed window size (px)
 let quitting = false;
@@ -60,7 +63,7 @@ function lockNavigation(win) {
 // ---------- desktop layer ----------
 /** No taskbar button, survives Win+D, stays under normal app windows. */
 function pinToDesktop(win) {
-  if (!win || win.isDestroyed()) return;
+  if (!win || win.isDestroyed() || (win === mainWin && loginMode)) return;
   win.setSkipTaskbar(true); // re-applied: Windows can drop it after hide/show
   winDesktop.attachToDesktop(win);
 }
@@ -73,7 +76,7 @@ function desktopWindows() {
 /** Push every calendar window back under the other programs, unless the user is using one of them. */
 function keepAtBottom() {
   const wins = desktopWindows();
-  if (moveMode || wins.some((w) => w.isFocused())) return;
+  if (moveMode || loginMode || wins.some((w) => w.isFocused())) return;
   wins.forEach((w) => winDesktop.sendToBottom(w));
 }
 
@@ -117,7 +120,7 @@ const sameBounds = (a, b) => a.x === b.x && a.y === b.y && a.width === b.width &
  * The user's own spot (config.bounds) is kept, so reconnecting the monitor brings it back there.
  */
 function ensureOnScreen() {
-  if (!mainWin || mainWin.isDestroyed() || moveMode) return;
+  if (!mainWin || mainWin.isDestroyed() || moveMode || loginMode) return;
   const target = visibleBounds(config.bounds);
   const want = collapsed ? { x: target.x, y: target.y, width: CHIP, height: CHIP } : target;
   if (!sameBounds(mainWin.getBounds(), want)) mainWin.setBounds(want);
@@ -186,7 +189,7 @@ function createMainWindow() {
     if (mainWin && !mainWin.isDestroyed() && !mainWin.isFocused()) mainWin.webContents.send('window-blur');
   }, 150));
   // Clicking the calendar must not lift it above other programs.
-  mainWin.on('focus', () => winDesktop.sendToBottom(mainWin));
+  mainWin.on('focus', () => { if (!loginMode) winDesktop.sendToBottom(mainWin); });
   // The window can only be moved/resized by the user in 위치 및 크기 mode. Moves at other times come
   // from us or Windows (e.g. a monitor was unplugged) and must not replace the user's chosen spot.
   const remember = () => {
@@ -213,7 +216,7 @@ function createMainWindow() {
 function openSetup() {
   if (setupWin) return setupWin.focus();
   setupWin = new BrowserWindow({
-    width: 460, height: 340, resizable: false, title: '서버 주소 설정', icon: ICON, skipTaskbar: true,
+    width: 460, height: 340, resizable: false, title: '서버 주소 설정', icon: ICON,
     autoHideMenuBar: true, webPreferences: webPrefs,
   });
   setupWin.loadFile(path.join(__dirname, 'setup.html'), { query: { current: config.serverUrl || '' } });
@@ -221,6 +224,35 @@ function openSetup() {
     setupWin = null;
     if (!config.serverUrl) app.quit();
   });
+}
+
+/**
+ * Login screen: take the calendar off the desktop layer so it shows on the taskbar, comes to the
+ * front and can't hide behind other windows; after login, put it back where the user keeps it.
+ */
+function setLoginMode(on) {
+  if (!mainWin || mainWin.isDestroyed() || loginMode === on) return;
+  loginMode = on;
+  if (on) {
+    if (moveMode) setMoveMode(false);
+    winDesktop.detachFromDesktop(mainWin);
+    mainWin.setSkipTaskbar(false);
+    mainWin.setTitle('업무 캘린더 - 로그인');
+    const { workArea: w } = screen.getPrimaryDisplay();
+    const width = Math.min(480, w.width);
+    const height = Math.min(640, w.height);
+    mainWin.setBounds({ width, height, x: w.x + Math.round((w.width - width) / 2), y: w.y + Math.round((w.height - height) / 2) });
+    mainWin.show();
+    mainWin.moveTop();
+    mainWin.focus();
+  } else {
+    mainWin.setTitle('업무 캘린더');
+    const here = visibleBounds(config.bounds);
+    mainWin.setBounds(collapsed ? { x: here.x, y: here.y, width: CHIP, height: CHIP } : here);
+    pinToDesktop(mainWin);
+    winDesktop.sendToBottom(mainWin);
+  }
+  updateTray();
 }
 
 /** 캘린더 설정 in its own window, so it can be moved anywhere on screen (not clipped by the calendar). */
@@ -261,7 +293,7 @@ function setVisible(visible) {
 
 /** 접기: shrink the calendar to a small square at its top-left corner (and back). */
 function setCollapsed(on) {
-  if (!mainWin || collapsed === on) return;
+  if (!mainWin || collapsed === on || loginMode) return;
   if (on && moveMode) setMoveMode(false);
   const here = visibleBounds(config.bounds); // where the calendar is shown on the current screens
   collapsed = on;
@@ -425,11 +457,12 @@ ipcMain.on('toggle-move', () => setMoveMode(!moveMode));
 ipcMain.on('set-collapsed', (_e, on) => setCollapsed(Boolean(on)));
 ipcMain.on('apply-settings', (_e, s) => applySettings(s));
 ipcMain.on('open-settings', (_e, tab) => openSettings(tab));
+ipcMain.on('login-mode', (_e, on) => setLoginMode(Boolean(on)));
 ipcMain.on('activate-window', (e) => {
   const w = BrowserWindow.fromWebContents(e.sender);
   if (!w || w.isDestroyed() || w.isFocused()) return;
   w.focus(); // take keyboard input; the 'focus' handler then puts the calendar back under other windows
-  if (w === mainWin) winDesktop.sendToBottom(w);
+  if (w === mainWin && !loginMode) winDesktop.sendToBottom(w);
 });
 ipcMain.on('settings-preview', (_e, patch) => mainWin?.webContents.send('settings-preview', patch));
 ipcMain.handle('save-server', async (_e, url) => {

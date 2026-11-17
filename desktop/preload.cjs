@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 // Exposed to the web app as window.workcalDesktop (see web/src/lib/desktop.js).
 contextBridge.exposeInMainWorld('workcalDesktop', {
   changeServer: () => ipcRenderer.send('change-server'),
+  setLoginMode: (on) => ipcRenderer.send('login-mode', Boolean(on)),
   quit: () => ipcRenderer.send('quit'),
   hide: () => ipcRenderer.send('hide'),
   toggleMoveResize: () => ipcRenderer.send('toggle-move'),

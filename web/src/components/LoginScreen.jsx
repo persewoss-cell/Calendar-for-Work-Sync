@@ -9,6 +9,16 @@ export function LoginScreen({ onLoggedIn }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // PC app: show the login as a normal front window with a taskbar button (not on the desktop layer).
+  useEffect(() => {
+    document.body.classList.add('login-mode');
+    desktop?.setLoginMode?.(true);
+    return () => {
+      document.body.classList.remove('login-mode');
+      desktop?.setLoginMode?.(false);
+    };
+  }, []);
+
   useEffect(() => {
     api.authConfig().then((c) => setAllowSignup(c.allowSignup)).catch(() => setError('서버에 연결할 수 없습니다.'));
   }, []);

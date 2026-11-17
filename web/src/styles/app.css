@@ -626,3 +626,10 @@ body.settings-window-body { background: #d4d9e0; }
   .m-head-actions > button { width: 30px; }
   .m-head-actions .m-today { padding: 0 7px; font-size: 12px; }
 }
+
+/* login screen in the desktop app: opaque, and draggable by the background */
+body.desktop-shell.login-mode {
+  background: radial-gradient(900px 600px at 80% 20%, #1b6fe0 0%, transparent 60%), linear-gradient(120deg, #03a9f4 0%, #0288d1 35%, #0d47a1 100%);
+}
+body.desktop-shell.login-mode .login { -webkit-app-region: drag; }
+body.desktop-shell.login-mode .login-card { -webkit-app-region: no-drag; }

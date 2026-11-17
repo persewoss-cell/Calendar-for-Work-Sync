@@ -76,6 +76,17 @@ function attachToDesktop(win) {
   }
 }
 
+/** Undo attachToDesktop: a normal top-level window again (taskbar button, can come to the front). */
+function detachFromDesktop(win) {
+  const a = load();
+  if (!a || !win || win.isDestroyed()) return;
+  try {
+    a.SetWindowLongPtrW(hwndOf(win), GWLP_HWNDPARENT, 0);
+  } catch (err) {
+    console.warn('[desktop] detach failed:', err.message);
+  }
+}
+
 /** Put the window under all normal windows (just above the desktop icons). */
 function sendToBottom(win) {
   const a = load();
@@ -133,4 +144,4 @@ function watchForeground(onOtherWindow) {
   };
 }
 
-module.exports = { attachToDesktop, sendToBottom, ownerLost, watchForeground, isSupported: () => Boolean(load()) };
+module.exports = { attachToDesktop, detachFromDesktop, sendToBottom, ownerLost, watchForeground, isSupported: () => Boolean(load()) };
