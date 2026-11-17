@@ -5,7 +5,11 @@ async function request(method, url, body) {
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
-  const data = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
+  const type = res.headers.get('content-type') || '';
+  // While the free server wakes up, Render answers with its own "waking up" web page instead of
+  // our data. Treat that as "not connected yet" (never as an empty answer or a logout).
+  if (type.includes('text/html')) throw Object.assign(new Error('서버가 깨어나는 중입니다.'), { status: 503 });
+  const data = type.includes('json') ? await res.json() : null;
   if (res.status === 401) {
     const err = new Error(data?.error && data.error !== 'unauthorized' ? data.error : '로그인이 필요합니다.');
     err.status = 401;

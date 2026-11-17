@@ -72,7 +72,9 @@ async function serverAnswers(ms) {
   const t = setTimeout(() => ctrl.abort(), ms);
   try {
     const r = await net.fetch(`${config.serverUrl}/healthz`, { signal: ctrl.signal, cache: 'no-store' });
-    return r.ok;
+    // Our server answers {"ok":true}; Render's "waking up" page (HTML) doesn't count.
+    if (!r.ok || !(r.headers.get('content-type') || '').includes('json')) return false;
+    return (await r.json())?.ok === true;
   } catch {
     return false;
   } finally {
@@ -104,8 +106,8 @@ async function saveShell() {
       return r.text();
     };
     let html = await get('/');
-    const js = html.match(/<script type="module"[^>]*\ssrc="([^"]+)"[^>]*><\/script>/);
-    const css = html.match(/<link rel="stylesheet"[^>]*\shref="([^"]+)"[^>]*>/);
+    const js = html.match(/<script type="module"[^>]*\ssrc="(\/assets\/[^"]+\.js)"[^>]*><\/script>/);
+    const css = html.match(/<link rel="stylesheet"[^>]*\shref="(\/assets\/[^"]+\.css)"[^>]*>/);
     if (!js || !css) return;
     const code = (await get(js[1])).replace(/<\/script/gi, '<\\/script');
     const style = (await get(css[1])).replace(/<\/style/gi, '<\\/style');
