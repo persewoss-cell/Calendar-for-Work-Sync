@@ -2,17 +2,24 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { api } from './api.js';
 import { mergeSettings, migrateSettings } from './settings.js';
+import { clearCache, loadCache, saveCache } from './offlineCache.js';
 
 /** Loads the signed-in user's data and keeps it live across devices via socket.io. */
 export function useData(range) {
-  const [me, setMe] = useState(undefined); // undefined = loading, null = signed out
-  const [settings, setSettings] = useState(mergeSettings());
-  const [events, setEvents] = useState([]);
-  const [days, setDays] = useState({}); // date → { bg, list } (cell color, list style)
-  const [countdowns, setCountdowns] = useState([]);
+  // Start from what this device saved last time, so the calendar shows at once; the server
+  // data replaces it as soon as it arrives (`confirmed`).
+  const [cache] = useState(loadCache);
+  const sameRange = (r) => r && r.from === range.from && r.to === range.to;
+  const [me, setMe] = useState(cache?.me); // undefined = loading, null = signed out
+  const [confirmed, setConfirmed] = useState(!cache);
+  const [settings, setSettings] = useState(() => mergeSettings(cache?.me?.settings));
+  const [events, setEvents] = useState(() => (cache && sameRange(cache.events) ? cache.events.list : []));
+  const [days, setDays] = useState(() => (cache && sameRange(cache.days) ? cache.days.map : {})); // date → { bg, list }
+  const [countdowns, setCountdowns] = useState(() => cache?.countdowns || []);
   const [online, setOnline] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const rangeRef = useRef(range);
+  const homeRange = useRef(range); // the view the app opens on (this month)
   rangeRef.current = range;
   const saveTimer = useRef(null);
   const pendingSettings = useRef({});
@@ -43,9 +50,10 @@ export function useData(range) {
       }
       setMe(m);
       setSettings(mergeSettings({ ...m.settings, ...pendingSettings.current }));
+      setConfirmed(true);
       return m;
     } catch (e) {
-      if (e.status === 401) setMe(null);
+      if (e.status === 401) { clearCache(); setMe(null); }
       else setOnline(false);
       return null;
     }
@@ -93,6 +101,26 @@ export function useData(range) {
     }, 400);
   }, []);
 
+  // Keep this device's copy up to date (only with data the server has confirmed).
+  useEffect(() => {
+    if (me === null) { clearCache(); return undefined; }
+    if (!me || !confirmed) return undefined;
+    const t = setTimeout(() => {
+      const r = rangeRef.current;
+      const home = homeRange.current;
+      // Only the opening view's items are kept, so browsing other months doesn't replace them.
+      const atHome = r.from === home.from && r.to === home.to;
+      const prev = loadCache();
+      saveCache({
+        me: { ...me, settings },
+        events: atHome ? { from: r.from, to: r.to, list: events } : prev?.events,
+        days: atHome ? { from: r.from, to: r.to, map: days } : prev?.days,
+        countdowns,
+      });
+    }, 800);
+    return () => clearTimeout(t);
+  }, [me, confirmed, settings, events, days, countdowns]);
+
   /** Reload everything from the server. Resolves true when the server answered. */
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -121,6 +149,6 @@ export function useData(range) {
     me, setMe, loadMe, settings, updateSettings, previewSettings, events, setEvents, loadEvents, days, setDays,
     countdowns, setCountdowns, loadCountdowns,
     online, refreshing, refresh,
-    syncing: refreshing || !online,
+    syncing: refreshing || !online || !confirmed, // spin until the server has answered at least once
   };
 }

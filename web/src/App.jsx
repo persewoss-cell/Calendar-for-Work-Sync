@@ -31,6 +31,7 @@ import { DateDialog, ExportDialog, HelpDialog, MobileDialog, SearchDialog } from
 import { DayEditor } from './components/DayEditor.jsx';
 import { MobileShell } from './components/Mobile.jsx';
 import { ensureFonts, fontsInHtml } from './lib/fonts.js';
+import { loadCache } from './lib/offlineCache.js';
 import { LoginScreen } from './components/LoginScreen.jsx';
 import { Icon } from './components/Icon.jsx';
 import { Modal } from './components/Modal.jsx';
@@ -62,7 +63,7 @@ export default function App() {
   const today = useToday(tz);
   const [anchorRaw, setAnchor] = useState(null);
   const [range, setRange] = useState(() => {
-    const d = mergeSettings();
+    const d = mergeSettings(loadCache()?.me?.settings); // open on the same view as last time
     const g = buildGrid(d, anchorFor(d, todayIn(d.timezone)));
     return { from: g.from, to: g.to };
   });

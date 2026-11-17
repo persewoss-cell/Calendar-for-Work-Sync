@@ -60,6 +60,68 @@ function lockNavigation(win) {
   });
 }
 
+// ---------- instant start ----------
+// The free server sleeps when unused and takes 20-30 s to wake. The page is kept on this PC
+// (one self-contained HTML file) and shown at once when the server is slow to answer; it then
+// syncs on its own once the server is up. It keeps the server's address, so the login and
+// saved data on this PC work as usual.
+const shellFile = () => path.join(app.getPath('userData'), 'app-copy.html');
+
+async function serverAnswers(ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await net.fetch(`${config.serverUrl}/healthz`, { signal: ctrl.signal, cache: 'no-store' });
+    return r.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function loadApp(win) {
+  const live = `${config.serverUrl}/`;
+  let copy = null;
+  try { copy = fs.readFileSync(shellFile()); } catch { /* none yet */ }
+  if (copy && !(await serverAnswers(2500))) {
+    if (win.isDestroyed()) return;
+    return win.loadURL(`data:text/html;charset=utf-8;base64,${copy.toString('base64')}`, { baseURLForDataURL: live })
+      .catch(() => {});
+  }
+  if (!win.isDestroyed()) win.loadURL(live).catch(() => {});
+}
+
+let savingShell = false;
+async function saveShell() {
+  if (savingShell) return;
+  savingShell = true;
+  try {
+    const base = `${config.serverUrl}/`;
+    const get = async (u) => {
+      const r = await net.fetch(new URL(u, base).href, { cache: 'no-store' });
+      if (!r.ok) throw new Error(`${r.status} ${u}`);
+      return r.text();
+    };
+    let html = await get('/');
+    const js = html.match(/<script type="module"[^>]*\ssrc="([^"]+)"[^>]*><\/script>/);
+    const css = html.match(/<link rel="stylesheet"[^>]*\shref="([^"]+)"[^>]*>/);
+    if (!js || !css) return;
+    const code = (await get(js[1])).replace(/<\/script/gi, '<\\/script');
+    const style = (await get(css[1])).replace(/<\/style/gi, '<\\/style');
+    html = html.replace(js[0], () => `<script type="module">${code}</script>`)
+      .replace(css[0], () => `<style>${style}</style>`)
+      .replace(/<link rel="manifest"[^>]*>/, '');
+    const tmp = `${shellFile()}.tmp`;
+    fs.writeFileSync(tmp, html);
+    fs.renameSync(tmp, shellFile());
+  } catch (err) {
+    console.warn('[desktop] could not keep a copy of the app:', err.message);
+  } finally {
+    savingShell = false;
+  }
+}
+
 // ---------- desktop layer ----------
 /** No taskbar button, survives Win+D, stays under normal app windows. */
 function pinToDesktop(win) {
@@ -178,7 +240,7 @@ function createMainWindow() {
     webPreferences: webPrefs,
   });
   lockNavigation(mainWin);
-  mainWin.loadURL(`${config.serverUrl}/`);
+  loadApp(mainWin);
   mainWin.once('ready-to-show', () => {
     mainWin.showInactive();
     pinToDesktop(mainWin);
@@ -208,8 +270,13 @@ function createMainWindow() {
     collapsed = false;
     if (!quitting) setTimeout(() => { if (!mainWin && !quitting) createMainWindow(); }, 3000);
   });
-  mainWin.webContents.on('did-fail-load', (_e, code, desc, url) => {
-    if (url.startsWith(config.serverUrl)) setTimeout(() => mainWin?.loadURL(`${config.serverUrl}/`), 10000);
+  mainWin.webContents.on('did-fail-load', (_e, code, desc, url, isMainFrame) => {
+    if (isMainFrame === false || code === -3 || !url.startsWith(config.serverUrl)) return; // -3 = aborted
+    setTimeout(() => { if (mainWin && !mainWin.isDestroyed()) loadApp(mainWin); }, 10000);
+  });
+  // Each time the live page loads, refresh the copy kept on this PC for the next start.
+  mainWin.webContents.on('did-finish-load', () => {
+    if (mainWin && mainWin.webContents.getURL().startsWith(config.serverUrl)) setTimeout(saveShell, 3000);
   });
 }
 
@@ -488,7 +555,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => setVisible(true));
 
   app.whenReady().then(async () => {
-    // The desktop app always loads the live server; drop any service worker left from older versions.
+    // Older versions could leave a service worker behind; the desktop app keeps its own copy instead.
     await session.defaultSession.clearStorageData({ storages: ['serviceworkers', 'cachestorage'] }).catch(() => {});
     loadConfig();
     createTray();

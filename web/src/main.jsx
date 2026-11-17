@@ -4,8 +4,9 @@ import App from './App.jsx';
 import SettingsWindow from './SettingsWindow.jsx';
 import './styles/app.css';
 
-// Offline cache for the browser / phone app only. The desktop app always loads the live server,
-// and a stale service worker there could keep it from loading after a server update.
+// Keep the app itself on the phone/browser (service worker) so it opens at once even while the free
+// server is waking up. The desktop app keeps its own copy instead (desktop/main.cjs), because
+// service workers are unreliable inside Electron.
 if (!window.workcalDesktop && 'serviceWorker' in navigator) {
   import('virtual:pwa-register').then(({ registerSW }) => registerSW({ immediate: true })).catch(() => {});
 }
