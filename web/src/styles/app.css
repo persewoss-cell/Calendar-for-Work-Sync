@@ -42,13 +42,22 @@ button { font: inherit; color: inherit; }
 }
 .toolbar.autohide { opacity: 0; transition: opacity .2s; }
 .toolbar.autohide:hover, .toolbar.autohide:focus-within { opacity: 1; }
-.tb-title { background: none; border: 0; cursor: pointer; letter-spacing: .3px; padding: 4px 10px; white-space: nowrap;
+.tb-title { background: none; border: 0; letter-spacing: .3px; padding: 4px 10px; white-space: nowrap;
   font-family: var(--t-title-font); font-size: var(--t-title-size); color: var(--t-title-color); font-weight: var(--t-title-weight); }
 .toolbar { min-height: 38px; height: auto; }
 .tb-right { display: flex; justify-content: flex-end; gap: 2px; }
 .tb-left { display: flex; }
-.month-chip { background: rgba(0, 0, 0, .15); border: 0; border-radius: 12px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
-.month-chip.away { background: rgba(255, 255, 255, .25); }
+/* Left: today's date in a soft pill (just text). Centre: the month shown, with an oval 「오늘로」
+   button right of it while another month is shown. The button hangs outside the centre box so
+   the month title stays exactly centred. */
+.today-chip { background: rgba(0, 0, 0, .15); border-radius: 12px; padding: 3px 10px; font-size: 12px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; min-width: 0; align-self: center; }
+.tb-left { min-width: 0; align-items: center; gap: 4px; }
+.tb-center { position: relative; display: flex; align-items: center; justify-content: center; }
+.today-btn { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 6px; white-space: nowrap;
+  background: rgba(255, 255, 255, .25); color: inherit; border: 1px solid rgba(255, 255, 255, .45); border-radius: 999px;
+  padding: 2px 11px; font-size: 12px; cursor: pointer; }
+.today-btn:hover { background: rgba(255, 255, 255, .4); }
 .icon-btn {
   position: relative; display: inline-grid; place-items: center;
   width: 32px; height: 30px; border: 0; background: none; border-radius: 6px; cursor: pointer; color: inherit;
@@ -328,9 +337,11 @@ body.card-window #root > div { height: 100vh; border-radius: 6px; }
 /* ---------- mobile ---------- */
 .compact { padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
 .compact .toolbar { grid-template-columns: auto 1fr; height: 44px; }
-.compact .tb-title { display: none; }
-.compact .tb-left { min-width: 0; }
-.compact .month-chip { font-size: 14px; font-weight: 600; background: none; }
+.compact .toolbar { grid-template-columns: auto 1fr auto; }
+.compact .today-chip { display: none; }
+.compact .tb-center { justify-content: flex-start; }
+.compact .tb-title { font-size: 14px; font-weight: 600; padding: 4px 6px; }
+.compact .today-btn { position: static; transform: none; margin-left: 2px; }
 .compact .icon-btn { width: 34px; }
 .compact .cell { cursor: pointer; padding: 2px; }
 .compact .cell-head { flex-wrap: nowrap; }

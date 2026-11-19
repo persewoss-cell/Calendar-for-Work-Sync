@@ -61,8 +61,11 @@ const Item = ({ icon, children, onClick, right, disabled }) => (
 export function Toolbar({ s, today, anchor, actions, countdowns, ddayActions, version, syncing }) {
   const [y, m, d] = parts(today);
   const wd = (s.language === 'en' ? WEEKDAYS.en : WEEKDAYS.ko)[weekday(today)];
-  const title = s.language === 'en' ? `Today is ${wd}, ${today}` : `오늘은 ${y}년${m}월${d}일 ${wd}`;
+  const todayText = s.language === 'en' ? `Today is ${wd}, ${today}` : `오늘은 ${y}년 ${m}월 ${d}일 ${wd}`;
   const [ay, am] = parts(anchor);
+  const monthTitle = s.language === 'en'
+    ? new Date(ay, am - 1, 1).toLocaleString('en', { month: 'long', year: 'numeric' })
+    : `${ay}년 ${am}월`;
   const away = s.viewStyle === 'month' ? anchor.slice(0, 7) !== today.slice(0, 7) : false;
   const color = s.titleButtonColor;
 
@@ -73,13 +76,16 @@ export function Toolbar({ s, today, anchor, actions, countdowns, ddayActions, ve
         <button className="icon-btn" style={{ color: s.titleButtonColor }} title="접기 (제목 줄 더블클릭)" aria-label="캘린더 접기" onClick={actions.collapse}>
           <Icon name="collapse" size={16} />
         </button>
-        {s.viewStyle === 'month' && (
-          <button className={`month-chip ${away ? 'away' : ''}`} onClick={actions.goToday} title="오늘로 이동">
-            {ay}년 {am}월{away && <small> · 오늘로</small>}
+        <span className="today-chip">{todayText}</span>
+      </div>
+      <div className="tb-center">
+        <span className="tb-title">{monthTitle}</span>
+        {away && (
+          <button type="button" className="today-btn" onClick={actions.goToday} title="이번 달로 이동">
+            {s.language === 'en' ? 'Today' : '오늘로'}
           </button>
         )}
       </div>
-      <button className="tb-title" onClick={actions.goToday} title="오늘로 이동">{title}</button>
       <div className="tb-right" style={{ color }}>
         <button className={`icon-btn sync-btn ${syncing ? 'syncing' : ''}`} style={{ color }} aria-label="동기화"
           title={syncing ? '서버와 동기화하는 중…' : '눌러서 서버와 다시 동기화'} onClick={actions.sync}>
