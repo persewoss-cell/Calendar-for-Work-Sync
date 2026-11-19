@@ -134,7 +134,7 @@ button { font: inherit; color: inherit; }
 .items { font-family: var(--edit-font); font-size: var(--edit-size); color: var(--edit-color);
   list-style: none; margin: 1px 0 0; padding: 0; overflow-y: auto; flex: 1; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.3) transparent; }
 .item {
-  display: flex; align-items: center; gap: 3px; line-height: 1.25; margin: var(--line-gap) 0;
+  display: flex; align-items: flex-start; gap: 3px; line-height: 1.25; margin: var(--line-gap) 0;
   padding: 0 2px; border-radius: 3px; cursor: default; min-width: 0;
 }
 .item:hover { background: rgba(255, 255, 255, .12); }
@@ -142,6 +142,12 @@ button { font: inherit; color: inherit; }
 @media (hover: none) { .item-check { visibility: visible; } }
 .item-check { visibility: hidden; margin: 0 1px 0 0; width: 12px; height: 12px; accent-color: #fff; flex: none; cursor: pointer; }
 .item-marker { flex: none; opacity: .9; }
+/* Text wrapping onto 2+ lines: the marker and small icons stay beside the first line
+   (each is centred on the first line's height of 1.25em). */
+.item > .item-check { margin-top: calc(.625em - 6px); }
+.item > .done-icon { margin-top: calc(.625em - 6px); }
+.item > .item-reminder, .item > .item-flag { margin-top: calc(.625em - 5px); }
+.item > .item-delete { margin-top: calc(.625em - 8px); }
 .item-text { flex: 1; min-width: 0; overflow-wrap: anywhere; cursor: pointer; }
 .item-time { opacity: .8; margin-right: 4px; font-size: .92em; }
 .item-part { opacity: .7; font-size: .85em; }
