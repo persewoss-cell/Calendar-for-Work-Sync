@@ -344,6 +344,12 @@ export default function App() {
   const classes = ['app', s.glass && 'glass', s.shadow && 'shadow', isDesktop && 'is-desktop', compact && 'compact', `view-${s.viewStyle}`].filter(Boolean).join(' ');
 
   const actions = {
+    goMonth: (yy, mm) => {
+      const first = `${yy}-${String(mm).padStart(2, '0')}-01`;
+      // This month → today's week/month as usual; another month → its first day.
+      if (first.slice(0, 7) === today.slice(0, 7)) setAnchor(null);
+      else setAnchor(anchorFor(sv, first));
+    },
     goToday: () => { setAnchor(null); setHighlight(today); setTimeout(() => setHighlight(null), 1500); },
     step: (dir) => setAnchor(stepAnchor(sv, anchorRaw ?? anchorFor(sv, today), dir)),
     openEvent: (item) => setDialog({ type: 'event', item, alarm: true }),

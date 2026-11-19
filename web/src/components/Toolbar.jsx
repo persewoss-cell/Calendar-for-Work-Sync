@@ -50,6 +50,59 @@ function Dropdown({ icon, title, children, badge, color, panel }) {
   );
 }
 
+/** Centre title: the year and the month are buttons; each opens a small picker that jumps there at once. */
+function MonthTitle({ y, m, lang, onPick }) {
+  const [open, setOpen] = useState(null); // 'year' | 'month' | null
+  const [base, setBase] = useState(y); // first year of the 12 shown in the year picker
+  const close = () => setOpen(null);
+  const ref = useOutside(Boolean(open), close);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('keydown', onKey);
+    const offDesktop = desktop?.onWindowBlur?.(close);
+    return () => { window.removeEventListener('keydown', onKey); offDesktop?.(); };
+  }, [open]);
+  const toggle = (which) => { setBase(y - 5); setOpen((o) => (o === which ? null : which)); };
+  const pick = (yy, mm) => { close(); onPick(yy, mm); };
+  const en = lang === 'en';
+  const monthName = (mm) => (en ? new Date(2000, mm - 1, 1).toLocaleString('en', { month: 'short' }) : `${mm}월`);
+  return (
+    <span className="ym" ref={ref}>
+      <button type="button" className={`ym-btn ${open === 'year' ? 'on' : ''}`} onClick={() => toggle('year')} title="연도 선택" aria-expanded={open === 'year'}>
+        {en ? y : `${y}년`}
+      </button>
+      <button type="button" className={`ym-btn ${open === 'month' ? 'on' : ''}`} onClick={() => toggle('month')} title="월 선택" aria-expanded={open === 'month'}>
+        {en ? new Date(2000, m - 1, 1).toLocaleString('en', { month: 'long' }) : `${m}월`}
+      </button>
+      {open === 'year' && (
+        <div className="ym-pop" role="dialog" aria-label="연도 선택">
+          <div className="ym-pop-head">
+            <button type="button" className="ym-nav" onClick={() => setBase(base - 12)} aria-label="이전 연도들"><Icon name="left" size={16} /></button>
+            <span>{base} – {base + 11}</span>
+            <button type="button" className="ym-nav" onClick={() => setBase(base + 12)} aria-label="다음 연도들"><Icon name="right" size={16} /></button>
+          </div>
+          <div className="ym-grid">
+            {Array.from({ length: 12 }, (_, i) => base + i).map((yy) => (
+              <button type="button" key={yy} className={`ym-cell ${yy === y ? 'cur' : ''}`} onClick={() => pick(yy, m)}>{yy}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      {open === 'month' && (
+        <div className="ym-pop" role="dialog" aria-label="월 선택">
+          <div className="ym-pop-head"><span>{en ? y : `${y}년`}</span></div>
+          <div className="ym-grid">
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((mm) => (
+              <button type="button" key={mm} className={`ym-cell ${mm === m ? 'cur' : ''}`} onClick={() => pick(y, mm)}>{monthName(mm)}</button>
+            ))}
+          </div>
+        </div>
+      )}
+    </span>
+  );
+}
+
 const Item = ({ icon, children, onClick, right, disabled }) => (
   <button className="menu-item" onClick={onClick} disabled={disabled}>
     <span className="menu-icon">{icon && <Icon name={icon} size={16} />}</span>
@@ -63,9 +116,6 @@ export function Toolbar({ s, today, anchor, actions, countdowns, ddayActions, ve
   const wd = (s.language === 'en' ? WEEKDAYS.en : WEEKDAYS.ko)[weekday(today)];
   const todayText = s.language === 'en' ? `Today is ${wd}, ${today}` : `오늘은 ${y}년 ${m}월 ${d}일 ${wd}`;
   const [ay, am] = parts(anchor);
-  const monthTitle = s.language === 'en'
-    ? new Date(ay, am - 1, 1).toLocaleString('en', { month: 'long', year: 'numeric' })
-    : `${ay}년 ${am}월`;
   const away = s.viewStyle === 'month' ? anchor.slice(0, 7) !== today.slice(0, 7) : false;
   const color = s.titleButtonColor;
 
@@ -79,7 +129,9 @@ export function Toolbar({ s, today, anchor, actions, countdowns, ddayActions, ve
         <span className="today-chip">{todayText}</span>
       </div>
       <div className="tb-center">
-        <span className="tb-title">{monthTitle}</span>
+        <span className="tb-title">
+          <MonthTitle y={ay} m={am} lang={s.language} onPick={(yy, mm) => actions.goMonth(yy, mm)} />
+        </span>
         {away && (
           <button type="button" className="today-btn" onClick={actions.goToday} title="이번 달로 이동">
             {s.language === 'en' ? 'Today' : '오늘로'}
@@ -87,6 +139,9 @@ export function Toolbar({ s, today, anchor, actions, countdowns, ddayActions, ve
         )}
       </div>
       <div className="tb-right" style={{ color }}>
+        <button className="icon-btn" style={{ color }} title="내용 검색" aria-label="검색" onClick={actions.openSearch}>
+          <Icon name="search" size={18} />
+        </button>
         <button className={`icon-btn sync-btn ${syncing ? 'syncing' : ''}`} style={{ color }} aria-label="동기화"
           title={syncing ? '서버와 동기화하는 중…' : '눌러서 서버와 다시 동기화'} onClick={actions.sync}>
           <Icon name="sync" size={18} className={syncing ? 'spin' : ''} />
