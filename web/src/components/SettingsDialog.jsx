@@ -133,7 +133,6 @@ function FontSelect({ value, onChange, commonFont }) {
         onKeyDown={(e) => { if (e.key === 'ArrowDown' && !open) { e.preventDefault(); show(); } }}>
         <span className="font-btn-label" style={{ fontFamily: current.css }}>{current.label}</span>
       </button>
-      <span className="font-sample" style={{ fontFamily: fontCss(value || commonFont) }}>가나다 123</span>
       {open && pos && (
         <div className="font-list" role="listbox" ref={listRef} style={{ left: pos.left, top: pos.top, maxHeight: pos.maxHeight }}>
           {options.map((o, i) => (
