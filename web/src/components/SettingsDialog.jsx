@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ColorInput, range, Row, Section, Select, Toggle } from './Modal.jsx';
 import { Icon } from './Icon.jsx';
 import { DEFAULT_SETTINGS } from '../lib/settings.js';
+import { downloadSettings, settingsFromFile } from '../lib/settingsFile.js';
 import { ensureFontPreviews, fontCss, FONTS } from '../lib/fonts.js';
 import { api } from '../lib/api.js';
 import { HOLIDAY_REGIONS } from '../lib/holidays.js';
@@ -260,6 +261,23 @@ export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', on
     return desktop?.onShortcutStatus?.((st) => setShortcutStatus(st || {}));
   }, []);
   const current = TABS.find((t) => t.id === tab);
+  // 설정값 내보내기 / 가져오기 (a .json file with the settings only, not the calendar items)
+  const fileRef = useRef(null);
+  const [fileMsg, setFileMsg] = useState('');
+  useEffect(() => { if (!fileMsg) return undefined; const t = setTimeout(() => setFileMsg(''), 4000); return () => clearTimeout(t); }, [fileMsg]);
+  const importSettings = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const next = settingsFromFile(await file.text());
+      if (!confirm(`「${file.name}」의 설정으로 바꿀까요?\n지금 계정의 설정(모양·글꼴·단축키 등)이 이 파일의 값으로 바뀝니다. 일정은 바뀌지 않습니다.`)) return;
+      update(next);
+      setFileMsg('설정을 가져와 적용했습니다.');
+    } catch (err) {
+      setFileMsg(`!${err.message}`);
+    }
+  };
 
   return (
     <div className={standalone ? 'settings-layer standalone' : 'settings-layer'}>
@@ -277,6 +295,16 @@ export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', on
                 <Icon name={t.icon} size={18} /> {t.label}
               </button>
             ))}
+            <div className="settings-file">
+              <button type="button" className="settings-file-btn" onClick={() => { downloadSettings(s); setFileMsg('설정 파일을 저장했습니다.'); }}>
+                <Icon name="download" size={14} /> 설정값 내보내기
+              </button>
+              <button type="button" className="settings-file-btn" onClick={() => fileRef.current?.click()}>
+                <Icon name="upload" size={14} /> 설정값 가져오기
+              </button>
+              <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={importSettings} />
+              {fileMsg && <small className={`settings-file-msg ${fileMsg.startsWith('!') ? 'bad' : ''}`}>{fileMsg.replace(/^!/, '')}</small>}
+            </div>
             <button className="reset-link" onClick={() => confirm('모든 설정을 기본값으로 되돌릴까요?') && update({ ...DEFAULT_SETTINGS })}>
               기본 설정으로 사용
             </button>
