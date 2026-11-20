@@ -41,7 +41,13 @@ let lastSettings = {};
 
 const serverOrigin = () => { try { return new URL(config.serverUrl).origin; } catch { return null; } };
 
+// A desktop widget is often covered by other windows. Chromium then treats it as hidden and stops
+// drawing it, so a change (e.g. 맨 위로 → opaque) could show only after the next click. Keep it drawing.
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+
 const webPrefs = {
+  backgroundThrottling: false,
   preload: path.join(__dirname, 'preload.cjs'),
   contextIsolation: true,
   nodeIntegration: false,
@@ -399,6 +405,10 @@ function setOnTop(on) {
     updateTray();
   }
   mainWin.webContents.send('on-top', onTop);
+  // Make sure the new look (opaque / see-through) is drawn now, not at the next click.
+  for (const ms of [60, 250, 600]) {
+    setTimeout(() => { if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.invalidate(); }, ms);
+  }
 }
 
 function setMoveMode(on) {
