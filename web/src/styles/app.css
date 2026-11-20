@@ -50,13 +50,15 @@ button { font: inherit; color: inherit; }
 /* Left: today's date in a soft pill (just text). Centre: the month shown, with an oval 「오늘로」
    button right of it while another month is shown. The button hangs outside the centre box so
    the month title stays exactly centred. */
-.today-chip { background: rgba(0, 0, 0, .15); border-radius: 12px; padding: 3px 10px; font-size: 12px; white-space: nowrap;
+.today-chip { background: rgba(0, 0, 0, .15); border-radius: 999px; padding: .25em .85em; white-space: nowrap;
+  font-family: var(--t-today-font); font-size: var(--t-today-size); color: var(--t-today-color); font-weight: var(--t-today-weight);
   overflow: hidden; text-overflow: ellipsis; min-width: 0; align-self: center; }
 .tb-left { min-width: 0; align-items: center; gap: 4px; }
 .tb-center { position: relative; display: flex; align-items: center; justify-content: center; gap: 4px; }
 .today-btn { white-space: nowrap; margin-left: 2px;
   background: rgba(255, 255, 255, .25); color: inherit; border: 1px solid rgba(255, 255, 255, .45); border-radius: 999px;
-  padding: 2px 11px; font-size: 12px; cursor: pointer; }
+  padding: .05em .75em; cursor: pointer; line-height: 1.35;
+  font-family: var(--t-title-font); font-size: var(--t-title-size); color: var(--t-title-color); font-weight: var(--t-title-weight); }
 .today-btn:hover { background: rgba(255, 255, 255, .4); }
 .today-btn.idle { visibility: hidden; }
 .icon-btn {
@@ -653,9 +655,11 @@ body.desktop-shell.login-mode .login { -webkit-app-region: drag; }
 body.desktop-shell.login-mode .login-card { -webkit-app-region: no-drag; }
 
 /* ---------- title: year / month pickers ---------- */
-.ym { position: relative; display: inline-flex; gap: 4px; align-items: center; }
+.ym { position: relative; display: inline-flex; gap: 3px; align-items: center; }
+.ym-unit { margin-right: 4px; }
+.ym-unit:last-of-type { margin-right: 0; }
 .ym-btn { font: inherit; color: inherit; letter-spacing: inherit; background: rgba(255, 255, 255, .12);
-  border: 1px solid rgba(255, 255, 255, .28); border-radius: 8px; padding: 0 8px; cursor: pointer; line-height: 1.35; }
+  border: 1px solid rgba(255, 255, 255, .28); border-radius: 8px; padding: 0 .4em; cursor: pointer; line-height: 1.35; min-width: 1.6em; }
 .ym-btn:hover, .ym-btn.on { background: rgba(255, 255, 255, .28); }
 .ym-pop { position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 60; width: 236px;
   background: #fff; color: #222; border-radius: 10px; padding: 8px; box-shadow: 0 10px 30px rgba(0, 0, 0, .25);

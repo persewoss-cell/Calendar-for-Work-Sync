@@ -35,7 +35,8 @@ export const DEFAULT_SETTINGS = {
   // 글꼴 및 색상 — 캘린더 글꼴: 달력의 제목·요일·날짜 등 (항목별 크기·색·굵기)
   fontFamily: 'Dotum',
   calText: {
-    title: { size: 13, color: '#ffffff', bold: false }, // 상단 제목 (오늘은 …)
+    title: { size: 13, color: '#ffffff', bold: false }, // 상단 가운데 제목 (2026년 11월, 오늘로)
+    today: { size: 12, color: '#ffffff', bold: false }, // 상단 왼쪽 오늘 날짜 (오늘은 …)
     weekday: { size: 13, color: '#ffffff', bold: false }, // 요일
     day: { size: 12, color: '#ffffff', bold: false }, // 날짜 숫자
     month: { size: 12, color: '#ffffff', bold: false }, // 월 표시 (11월)
@@ -103,6 +104,7 @@ export function migrateSettings(saved = {}) {
   return {
     calText: {
       title: { ...base, size: Math.max(size, 13) },
+      today: { ...base, size: 12 },
       weekday: { ...base, size: Math.max(size, 13) },
       day: { ...base, size: Math.max(size - 1, 10) },
       month: { ...base, size: Math.max(size - 1, 10) },

@@ -69,12 +69,15 @@ function MonthTitle({ y, m, lang, onPick }) {
   const monthName = (mm) => (en ? new Date(2000, mm - 1, 1).toLocaleString('en', { month: 'short' }) : `${mm}월`);
   return (
     <span className="ym" ref={ref}>
-      <button type="button" className={`ym-btn ${open === 'year' ? 'on' : ''}`} onClick={() => toggle('year')} title="연도 선택" aria-expanded={open === 'year'}>
-        {en ? y : `${y}년`}
+      {/* Only the numbers are buttons; 년 and 월 are plain text beside them. */}
+      <button type="button" className={`ym-btn ${open === 'year' ? 'on' : ''}`} onClick={() => toggle('year')} title="연도 선택" aria-label={`${y}년 (연도 선택)`} aria-expanded={open === 'year'}>
+        {y}
       </button>
-      <button type="button" className={`ym-btn ${open === 'month' ? 'on' : ''}`} onClick={() => toggle('month')} title="월 선택" aria-expanded={open === 'month'}>
-        {en ? new Date(2000, m - 1, 1).toLocaleString('en', { month: 'long' }) : `${m}월`}
+      {!en && <span className="ym-unit">년</span>}
+      <button type="button" className={`ym-btn ${open === 'month' ? 'on' : ''}`} onClick={() => toggle('month')} title="월 선택" aria-label={`${m}월 (월 선택)`} aria-expanded={open === 'month'}>
+        {en ? new Date(2000, m - 1, 1).toLocaleString('en', { month: 'long' }) : m}
       </button>
+      {!en && <span className="ym-unit">월</span>}
       {open === 'year' && (
         <div className="ym-pop" role="dialog" aria-label="연도 선택">
           <div className="ym-pop-head">

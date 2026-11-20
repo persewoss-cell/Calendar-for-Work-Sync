@@ -102,7 +102,8 @@ function FontSelect({ value, onChange, commonFont }) {
 const sizeOptions = (from, to) => range(from, to, (n) => `${n}px`);
 
 const CAL_TEXT = [
-  ['title', '상단 제목 (오늘은 …)', 10, 36],
+  ['title', '제목 (2026년 11월)', 10, 36],
+  ['today', '오늘 날짜 (왼쪽 위)', 8, 30],
   ['weekday', '요일', 9, 30],
   ['day', '날짜 숫자', 9, 40],
   ['month', '월 표시 (11월)', 9, 30],
