@@ -55,10 +55,11 @@ button { font: inherit; color: inherit; }
   overflow: hidden; text-overflow: ellipsis; min-width: 0; align-self: center; }
 .tb-left { min-width: 0; align-items: center; gap: 4px; }
 .tb-center { position: relative; display: flex; align-items: center; justify-content: center; gap: 4px; }
-.today-btn { white-space: nowrap; margin-left: 2px;
-  background: rgba(255, 255, 255, .25); color: inherit; border: 1px solid rgba(255, 255, 255, .45); border-radius: 999px;
-  padding: .05em .75em; cursor: pointer; line-height: 1.35;
-  font-family: var(--t-title-font); font-size: var(--t-title-size); color: var(--t-title-color); font-weight: var(--t-title-weight); }
+/* Same lettering as the left 「오늘은 …」 pill, text centred both ways. */
+.today-btn { white-space: nowrap; margin-left: 2px; display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, .25); border: 1px solid rgba(255, 255, 255, .45); border-radius: 999px;
+  padding: .3em .9em; cursor: pointer; line-height: 1; box-sizing: border-box;
+  font-family: var(--t-today-font); font-size: var(--t-today-size); color: var(--t-today-color); font-weight: var(--t-today-weight); }
 .today-btn:hover { background: rgba(255, 255, 255, .4); }
 .today-btn.idle { visibility: hidden; }
 .icon-btn {
