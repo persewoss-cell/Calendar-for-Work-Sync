@@ -480,6 +480,18 @@ body.card-window #root > div { height: 100vh; border-radius: 6px; }
 .bold-toggle.on { background: #1e88e5; color: #fff; border-color: #1e88e5; }
 .font-select { display: inline-flex; align-items: center; gap: 8px; }
 .font-select .select { max-width: 190px; }
+.font-btn { width: 190px; text-align: left; cursor: pointer; display: inline-flex; align-items: center; justify-content: space-between; gap: 6px;
+  background-image: none; }
+.font-btn::after { content: ''; flex: none; width: 7px; height: 7px; margin: -3px 2px 0 0; border: solid #666; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.font-btn.open::after { transform: rotate(-135deg); margin-top: 4px; }
+.font-btn-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+.font-list { position: fixed; z-index: 1000; width: 240px; overflow-y: auto; background: #fff; color: #222; border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .25); padding: 4px 0; overscroll-behavior: contain; }
+.font-list-group { font: 700 12px 'Malgun Gothic', sans-serif; color: #333; padding: 8px 12px 3px; }
+.font-opt { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 5px 12px 5px 22px; font-size: 17px;
+  color: #222; cursor: pointer; line-height: 1.3; }
+.font-opt:hover { background: #eef5fd; }
+.font-opt.on { background: #1e88e5; color: #fff; }
 .font-sample { min-width: 82px; font-size: 15px; color: #333; }
 .apply-ask { margin: 10px 0; padding: 10px 12px; border-radius: 8px; background: #fff8e1; border: 1px solid #ffe082; font-size: 13px; }
 .apply-ask p { margin: 0 0 8px; line-height: 1.5; }

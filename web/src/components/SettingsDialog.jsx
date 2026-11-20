@@ -81,20 +81,72 @@ function ShortcutRow({ label, value, onChange }) {
   );
 }
 
-/** Font picker grouped by kind, with a live sample. */
+/**
+ * Font picker grouped by kind. Each name in the list is drawn in its own font (주아 in 주아), so
+ * the user sees the lettering before choosing. A custom list, because a plain <select> can't
+ * show fonts. The list floats over the settings page (fixed position) so it is never cut off.
+ */
 function FontSelect({ value, onChange, commonFont }) {
-  const groups = [...new Set(FONTS.map((f) => f.group))];
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const btnRef = useRef(null);
+  const listRef = useRef(null);
+  const options = [
+    ...(commonFont !== undefined ? [{ value: '', label: '공통 글꼴 사용', css: fontCss(commonFont), group: '' }] : []),
+    ...FONTS,
+  ];
+  const current = options.find((o) => o.value === value) || options[0];
+
+  const show = () => {
+    ensureFontPreviews();
+    const r = btnRef.current.getBoundingClientRect();
+    const h = Math.min(360, window.innerHeight - 16);
+    const below = window.innerHeight - r.bottom - 8;
+    const top = below >= Math.min(h, 240) ? r.bottom + 4 : Math.max(8, r.top - 4 - h);
+    setPos({ left: Math.min(r.left, window.innerWidth - 248), top, maxHeight: Math.min(h, below >= 240 ? below : r.top - 12) });
+    setOpen(true);
+  };
+  const pick = (v) => { setOpen(false); onChange(v); btnRef.current?.focus(); };
+
+  useEffect(() => {
+    if (!open) return undefined;
+    listRef.current?.querySelector('.on')?.scrollIntoView({ block: 'center' });
+    const outside = (e) => { if (!listRef.current?.contains(e.target) && !btnRef.current?.contains(e.target)) setOpen(false); };
+    const key = (e) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); btnRef.current?.focus(); } };
+    const scroll = (e) => { if (!listRef.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', outside);
+    document.addEventListener('keydown', key, true);
+    document.addEventListener('scroll', scroll, true);
+    window.addEventListener('resize', scroll);
+    return () => {
+      document.removeEventListener('mousedown', outside);
+      document.removeEventListener('keydown', key, true);
+      document.removeEventListener('scroll', scroll, true);
+      window.removeEventListener('resize', scroll);
+    };
+  }, [open]);
+
   return (
     <span className="font-select">
-      <select className="select" value={value} onChange={(e) => onChange(e.target.value)} onFocus={ensureFontPreviews}>
-        {commonFont !== undefined && <option value="">공통 글꼴 사용</option>}
-        {groups.map((g) => (
-          <optgroup key={g} label={g}>
-            {FONTS.filter((f) => f.group === g).map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-          </optgroup>
-        ))}
-      </select>
+      <button type="button" ref={btnRef} className={`select font-btn ${open ? 'open' : ''}`} aria-haspopup="listbox" aria-expanded={open}
+        onClick={() => (open ? setOpen(false) : show())}
+        onKeyDown={(e) => { if (e.key === 'ArrowDown' && !open) { e.preventDefault(); show(); } }}>
+        <span className="font-btn-label" style={{ fontFamily: current.css }}>{current.label}</span>
+      </button>
       <span className="font-sample" style={{ fontFamily: fontCss(value || commonFont) }}>가나다 123</span>
+      {open && pos && (
+        <div className="font-list" role="listbox" ref={listRef} style={{ left: pos.left, top: pos.top, maxHeight: pos.maxHeight }}>
+          {options.map((o, i) => (
+            <div key={o.value || 'common'}>
+              {o.group && o.group !== options[i - 1]?.group && <div className="font-list-group">{o.group}</div>}
+              <button type="button" role="option" aria-selected={o.value === value} className={`font-opt ${o.value === value ? 'on' : ''}`}
+                style={{ fontFamily: o.css }} onClick={() => pick(o.value)}>
+                {o.label}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </span>
   );
 }
