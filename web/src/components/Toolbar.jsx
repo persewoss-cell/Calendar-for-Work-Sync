@@ -129,22 +129,24 @@ export function Toolbar({ s, today, anchor, actions, countdowns, ddayActions, ve
         <span className="today-chip">{todayText}</span>
       </div>
       <div className="tb-center">
+        <button className="icon-btn" style={{ color }} title="이전" aria-label="이전" onClick={() => actions.step(-1)}><Icon name="left" size={19} /></button>
         <span className="tb-title">
           <MonthTitle y={ay} m={am} lang={s.language} onPick={(yy, mm) => actions.goMonth(yy, mm)} />
         </span>
-        {away && (
-          <button type="button" className="today-btn" onClick={actions.goToday} title="이번 달로 이동">
-            {s.language === 'en' ? 'Today' : '오늘로'}
-          </button>
-        )}
+        {/* Its space is always kept, so the → button doesn't jump while paging through months. */}
+        <button type="button" className={`today-btn ${away ? '' : 'idle'}`} onClick={actions.goToday} title="이번 달로 이동"
+          tabIndex={away ? 0 : -1} aria-hidden={!away}>
+          {s.language === 'en' ? 'Today' : '오늘로'}
+        </button>
+        <button className="icon-btn" style={{ color }} title="다음" aria-label="다음" onClick={() => actions.step(1)}><Icon name="right" size={19} /></button>
       </div>
       <div className="tb-right" style={{ color }}>
-        <button className="icon-btn" style={{ color }} title="내용 검색" aria-label="검색" onClick={actions.openSearch}>
-          <Icon name="search" size={18} />
-        </button>
         <button className={`icon-btn sync-btn ${syncing ? 'syncing' : ''}`} style={{ color }} aria-label="동기화"
           title={syncing ? '서버와 동기화하는 중…' : '눌러서 서버와 다시 동기화'} onClick={actions.sync}>
           <Icon name="sync" size={18} className={syncing ? 'spin' : ''} />
+        </button>
+        <button className="icon-btn" style={{ color }} title="내용 검색" aria-label="검색" onClick={actions.openSearch}>
+          <Icon name="search" size={18} />
         </button>
         <Dropdown icon="bell" title="알림" color={color} panel>
           {(close) => (
@@ -161,8 +163,6 @@ export function Toolbar({ s, today, anchor, actions, countdowns, ddayActions, ve
           <Icon name="user" size={19} />
         </button>
         <button className="icon-btn" style={{ color }} title="캘린더 설정" aria-label="캘린더 설정" onClick={actions.openSettings}><Icon name="settings" size={19} /></button>
-        <button className="icon-btn" style={{ color }} title="이전" aria-label="이전" onClick={() => actions.step(-1)}><Icon name="left" size={19} /></button>
-        <button className="icon-btn" style={{ color }} title="다음" aria-label="다음" onClick={() => actions.step(1)}><Icon name="right" size={19} /></button>
         <Dropdown icon="menu" title="메뉴" color={color}>
           <Item icon="search" onClick={actions.openSearch}>내용 검색</Item>
           <Item onClick={actions.openDate}>날짜 선택</Item>
