@@ -6,8 +6,9 @@ import { ensureFontPreviews, fontCss, FONTS } from '../lib/fonts.js';
 import { api } from '../lib/api.js';
 import { HOLIDAY_REGIONS } from '../lib/holidays.js';
 import { playSound, SOUNDS } from '../lib/sound.js';
-import { isDesktop } from '../lib/desktop.js';
+import { desktop, isDesktop } from '../lib/desktop.js';
 import { WEEKDAYS } from '../lib/date.js';
+import { availableKeys, MODIFIERS, modifierLabel, splitShortcut } from '../lib/shortcuts.js';
 
 export const APP_VERSION = '1.0.0';
 
@@ -65,17 +66,34 @@ function ListStylePicker({ value, onChange }) {
   );
 }
 
-function ShortcutRow({ label, value, onChange }) {
+/**
+ * A shortcut chosen from two lists: the modifier keys, then a letter/number/symbol. Picking the
+ * modifiers first narrows the second list to keys nothing else uses with them (Windows, common
+ * programs, our other shortcuts). Shows when another program has already taken the combination.
+ */
+function ShortcutRow({ label, hint, value, onChange, used = [], status }) {
+  const parsed = splitShortcut(value.keys);
+  const known = MODIFIERS.some((m) => m.value === parsed.mod);
+  const mods = known ? MODIFIERS : [{ value: parsed.mod, label: modifierLabel(parsed.mod) }, ...MODIFIERS];
+  const keys = availableKeys(parsed.mod, used);
+  const keyOptions = keys.includes(parsed.key) || !parsed.key ? keys : [parsed.key, ...keys];
+  const setMod = (mod) => {
+    const free = availableKeys(mod, used);
+    onChange({ ...value, keys: `${mod}+${free.includes(parsed.key) ? parsed.key : free[0]}` });
+  };
   return (
-    <Row label={label} hint="키보드로 직접 입력하고 수정할 수 있습니다.">
-      <input className="input shortcut" value={value.keys}
-        onKeyDown={(e) => {
-          if (['Control', 'Alt', 'Shift', 'Meta', 'Tab'].includes(e.key)) return;
-          e.preventDefault();
-          const keys = [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'Meta', e.key.length === 1 ? e.key.toUpperCase() : e.key]
-            .filter(Boolean).join('+');
-          onChange({ ...value, keys });
-        }} readOnly />
+    <Row label={label} hint={status === false && value.enabled
+      ? <span className="shortcut-warn">다른 프로그램이 이미 쓰는 조합입니다. 다른 키를 골라 주세요.</span>
+      : hint}>
+      <span className="shortcut-pick">
+        <select className="select" value={parsed.mod} onChange={(e) => setMod(e.target.value)} aria-label={`${label} 조합 키`}>
+          {mods.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
+        <span className="shortcut-plus">+</span>
+        <select className="select" value={parsed.key} onChange={(e) => onChange({ ...value, keys: `${parsed.mod}+${e.target.value}` })} aria-label={`${label} 키`}>
+          {keyOptions.map((k) => <option key={k} value={k}>{k}</option>)}
+        </select>
+      </span>
       <Toggle checked={value.enabled} onChange={(enabled) => onChange({ ...value, enabled })} />
     </Row>
   );
@@ -234,6 +252,13 @@ export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', on
     try { localStorage.setItem('settingsPos', JSON.stringify(pos)); } catch { /* ignore */ }
   };
   const setShortcut = (k) => (v) => update({ shortcuts: { ...s.shortcuts, [k]: v } });
+  // Keys taken by our other shortcuts are not offered again.
+  const usedBy = (k) => Object.entries(s.shortcuts).filter(([n]) => n !== k).map(([, sc]) => sc.keys);
+  const [shortcutStatus, setShortcutStatus] = useState({});
+  useEffect(() => {
+    desktop?.getShortcutStatus?.().then((st) => setShortcutStatus(st || {})).catch(() => {});
+    return desktop?.onShortcutStatus?.((st) => setShortcutStatus(st || {}));
+  }, []);
   const current = TABS.find((t) => t.id === tab);
 
   return (
@@ -416,9 +441,11 @@ export function SettingsDialog({ s, update, onClose, initialTab = 'calendar', on
                   </Row>
                 </Section>
                 <Section title="단축키">
-                  <ShortcutRow label="캘린더 숨기기 단축키" value={s.shortcuts.hideCalendar} onChange={setShortcut('hideCalendar')} />
-                  <ShortcutRow label="예약된 작업 단축키 표시 및 숨기기" value={s.shortcuts.toggleTasks} onChange={setShortcut('toggleTasks')} />
-                  <ShortcutRow label="편집 완료 단축키" value={s.shortcuts.finishEdit} onChange={setShortcut('finishEdit')} />
+                  <ShortcutRow label="맨 위로 보기 / 바탕화면으로" hint="PC 앱: 달력을 모든 창 위에 투명하지 않게 띄우고, 다시 누르면 바탕화면으로 돌아갑니다."
+                    value={s.shortcuts.toggleOnTop} onChange={setShortcut('toggleOnTop')} used={usedBy('toggleOnTop')} status={shortcutStatus.toggleOnTop} />
+                  <ShortcutRow label="캘린더 숨기기" value={s.shortcuts.hideCalendar} onChange={setShortcut('hideCalendar')} used={usedBy('hideCalendar')} status={shortcutStatus.hideCalendar} />
+                  <ShortcutRow label="예약된 작업 표시 및 숨기기" value={s.shortcuts.toggleTasks} onChange={setShortcut('toggleTasks')} used={usedBy('toggleTasks')} status={shortcutStatus.toggleTasks} />
+                  <ShortcutRow label="편집 완료" value={s.shortcuts.finishEdit} onChange={setShortcut('finishEdit')} used={usedBy('finishEdit')} />
                 </Section>
                 <Section title="소프트웨어 설정">
                   <Row label="언어선택">

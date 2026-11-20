@@ -114,7 +114,7 @@ const Item = ({ icon, children, onClick, right, disabled }) => (
   </button>
 );
 
-export function Toolbar({ s, today, anchor, actions, countdowns, ddayActions, version, syncing }) {
+export function Toolbar({ s, today, anchor, actions, countdowns, ddayActions, version, syncing, onTop }) {
   const [y, m, d] = parts(today);
   const wd = (s.language === 'en' ? WEEKDAYS.en : WEEKDAYS.ko)[weekday(today)];
   const todayText = s.language === 'en' ? `Today is ${wd}, ${today}` : `오늘은 ${y}년 ${m}월 ${d}일 ${wd}`;
@@ -129,6 +129,13 @@ export function Toolbar({ s, today, anchor, actions, countdowns, ddayActions, ve
         <button className="icon-btn" style={{ color: s.titleButtonColor }} title="접기 (제목 줄 더블클릭)" aria-label="캘린더 접기" onClick={actions.collapse}>
           <Icon name="collapse" size={16} />
         </button>
+        {isDesktop && desktop?.setOnTop && (
+          <button className={`icon-btn ${onTop ? 'pressed' : ''}`} style={{ color: s.titleButtonColor }} onClick={actions.toggleOnTop}
+            title={onTop ? '바탕화면으로 내리기 (다시 투명하게)' : '맨 위로 올려서 보기 (투명 끄기)'}
+            aria-label={onTop ? '바탕화면으로 내리기' : '맨 위로 보기'} aria-pressed={onTop}>
+            <Icon name={onTop ? 'layerDown' : 'layerUp'} size={17} />
+          </button>
+        )}
         <span className="today-chip">{todayText}</span>
       </div>
       <div className="tb-center">

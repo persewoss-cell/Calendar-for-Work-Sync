@@ -24,6 +24,9 @@ const PATHS = {
   power: 'M12 3v9M6.3 6.3a8 8 0 1 0 11.4 0',
   check: 'M5 12l5 5 9-10',
   chevDown: 'M6 9l6 6 6-6',
+  // two stacked windows with an arrow: bring the calendar to the top / send it back down
+  layerUp: 'M9 8V4h11v11h-5M3 9h11v11H3zM8.5 17.5v-6M6 14l2.5-2.5L11 14',
+  layerDown: 'M9 8V4h11v11h-5M3 9h11v11H3zM8.5 11.5v6M6 15l2.5 2.5L11 15',
   bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4',
   repeat: 'M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4',
   plus: 'M12 5v14M5 12h14',

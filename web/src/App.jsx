@@ -225,13 +225,28 @@ export default function App() {
   }, []);
   useEffect(() => { if (me && isDesktop) desktop.setCollapsed?.(collapsed); }, [me, collapsed]);
 
+  // 「맨 위로」 (PC app): the calendar floats above all windows, fully opaque. The PC app owns the
+  // state (button, tray menu and shortcut all go through it) and tells the page.
+  const [onTop, setOnTop] = useState(false);
+  useEffect(() => {
+    if (!isDesktop || !desktop.onOnTop) return undefined;
+    desktop.getOnTop?.().then((v) => setOnTop(Boolean(v))).catch(() => {});
+    return desktop.onOnTop((v) => {
+      setOnTop(v);
+      if (v) { // from the shortcut or tray while folded: open up to be read
+        setCollapsed(false);
+        try { localStorage.setItem('collapsed', '0'); } catch { /* ignore */ }
+      }
+    });
+  }, []);
+
   // 자동 접기: after the set time without a click, key press, typing or scroll on the calendar.
   // Plain mouse movement does not count. Never while an editor or a dialog is open.
   const lastAction = useRef(Date.now());
   const busy = Boolean(editor || dialog);
   useEffect(() => {
     const ac = s.autoCollapse;
-    if (!me || phone || collapsed || !ac?.enabled) return undefined;
+    if (!me || phone || collapsed || onTop || !ac?.enabled) return undefined; // not while 맨 위로
     const limit = Math.max(5000, autoCollapseMs(ac));
     lastAction.current = Date.now();
     const mark = () => { lastAction.current = Date.now(); };
@@ -245,7 +260,7 @@ export default function App() {
       }
     }, 1000);
     return () => { clearInterval(t); events.forEach((ev) => window.removeEventListener(ev, mark, true)); };
-  }, [me, phone, collapsed, s.autoCollapse, busy]);
+  }, [me, phone, collapsed, onTop, s.autoCollapse, busy]);
 
   // ---------- D-day ----------
   const countdownActions = {
@@ -281,7 +296,8 @@ export default function App() {
     };
     const onKey = (e) => {
       for (const [name, sc] of Object.entries(s.shortcuts)) {
-        if (sc.enabled && name !== 'finishEdit' && match(e, sc.keys)) { e.preventDefault(); shortcutAction(name); }
+        // toggleOnTop exists only in the PC app, where it is a system-wide shortcut.
+        if (sc.enabled && name !== 'finishEdit' && name !== 'toggleOnTop' && !sc.keys.includes('Meta') && match(e, sc.keys)) { e.preventDefault(); shortcutAction(name); }
       }
       if (!e.target.closest?.('input, textarea, select') && !dialog) {
         if (e.key === 'ArrowLeft') setAnchor(stepAnchor(sv, anchorRaw ?? anchorFor(sv, today), -1));
@@ -326,7 +342,7 @@ export default function App() {
     );
   }
 
-  const alpha = (100 - s.opacity) / 100;
+  const alpha = onTop ? 1 : (100 - s.opacity) / 100; // 맨 위로: not see-through
   const style = {
     '--font': fontCss(s.fontFamily),
     ...calTextVars(s.calText),
@@ -341,7 +357,7 @@ export default function App() {
     '--line-gap': `${s.lineSpacing}px`,
     '--title-btn': s.titleButtonColor,
   };
-  const classes = ['app', s.glass && 'glass', s.shadow && 'shadow', isDesktop && 'is-desktop', compact && 'compact', `view-${s.viewStyle}`].filter(Boolean).join(' ');
+  const classes = ['app', s.glass && 'glass', s.shadow && 'shadow', isDesktop && 'is-desktop', onTop && 'on-top', compact && 'compact', `view-${s.viewStyle}`].filter(Boolean).join(' ');
 
   const actions = {
     goMonth: (yy, mm) => {
@@ -350,6 +366,7 @@ export default function App() {
       if (first.slice(0, 7) === today.slice(0, 7)) setAnchor(null);
       else setAnchor(anchorFor(sv, first));
     },
+    toggleOnTop: () => desktop?.setOnTop?.(!onTop),
     goToday: () => { setAnchor(null); setHighlight(today); setTimeout(() => setHighlight(null), 1500); },
     step: (dir) => setAnchor(stepAnchor(sv, anchorRaw ?? anchorFor(sv, today), dir)),
     openEvent: (item) => setDialog({ type: 'event', item, alarm: true }),
@@ -395,7 +412,7 @@ export default function App() {
     <div className={phone ? 'app phone' : classes} style={style}>
       {main}
       {!phone && <>
-      <Toolbar s={s} today={today} anchor={anchorRaw ?? anchorFor(sv, today)} actions={actions}
+      <Toolbar s={s} today={today} anchor={anchorRaw ?? anchorFor(sv, today)} actions={actions} onTop={onTop}
         countdowns={data.countdowns} ddayActions={countdownActions} version={events} syncing={data.syncing} />
       <CalendarView
         grid={realGrid} s={s} today={today} anchor={anchorRaw ?? anchorFor(sv, today)} byDay={byDay}

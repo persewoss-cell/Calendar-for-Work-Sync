@@ -480,6 +480,11 @@ body.card-window #root > div { height: 100vh; border-radius: 6px; }
 .bold-toggle.on { background: #1e88e5; color: #fff; border-color: #1e88e5; }
 .font-select { display: inline-flex; align-items: center; gap: 8px; }
 .font-select .select { max-width: 190px; }
+.shortcut-pick { display: inline-flex; align-items: center; gap: 4px; }
+.shortcut-pick .select:first-child { width: 168px; }
+.shortcut-pick .select:last-child { width: 72px; }
+.shortcut-plus { color: #666; }
+.shortcut-warn { color: #d32f2f; }
 .font-btn { width: 190px; text-align: left; cursor: pointer; display: inline-flex; align-items: center; justify-content: space-between; gap: 6px;
   background-image: none; }
 .font-btn::after { content: ''; flex: none; width: 7px; height: 7px; margin: -3px 2px 0 0; border: solid #666; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }

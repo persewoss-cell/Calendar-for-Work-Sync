@@ -63,6 +63,7 @@ export const DEFAULT_SETTINGS = {
   showRestDays: true,
   restDays: [0, 6],
   shortcuts: {
+    toggleOnTop: { enabled: true, keys: 'Ctrl+Alt+T' }, // PC 앱: 맨 위로 보기 ↔ 바탕화면
     hideCalendar: { enabled: false, keys: 'Ctrl+Alt+H' },
     toggleTasks: { enabled: false, keys: 'Ctrl+Alt+F' },
     finishEdit: { enabled: false, keys: 'Ctrl+Alt+E' },

@@ -32,6 +32,8 @@ let settingsWin = null;
 let tray = null;
 let moveMode = false;
 let loginMode = false; // the login screen is showing: a normal, opaque, front window with a taskbar button
+let onTop = false; // 「맨 위로」: the calendar floats above every window (opaque) until switched back
+let shortcutStatus = {}; // name → true (registered) | false (another program already uses it)
 let collapsed = false;
 const CHIP = 48; // collapsed window size (px)
 let quitting = false;
@@ -127,7 +129,7 @@ async function saveShell() {
 // ---------- desktop layer ----------
 /** No taskbar button, survives Win+D, stays under normal app windows. */
 function pinToDesktop(win) {
-  if (!win || win.isDestroyed() || (win === mainWin && loginMode)) return;
+  if (!win || win.isDestroyed() || (win === mainWin && (loginMode || onTop))) return;
   win.setSkipTaskbar(true); // re-applied: Windows can drop it after hide/show
   winDesktop.attachToDesktop(win);
 }
@@ -140,7 +142,7 @@ function desktopWindows() {
 /** Push every calendar window back under the other programs, unless the user is using one of them. */
 function keepAtBottom() {
   const wins = desktopWindows();
-  if (moveMode || loginMode || wins.some((w) => w.isFocused())) return;
+  if (moveMode || loginMode || onTop || wins.some((w) => w.isFocused())) return;
   wins.forEach((w) => winDesktop.sendToBottom(w));
 }
 
@@ -253,7 +255,7 @@ function createMainWindow() {
     if (mainWin && !mainWin.isDestroyed() && !mainWin.isFocused()) mainWin.webContents.send('window-blur');
   }, 150));
   // Clicking the calendar must not lift it above other programs.
-  mainWin.on('focus', () => { if (!loginMode) winDesktop.sendToBottom(mainWin); });
+  mainWin.on('focus', () => { if (!loginMode && !onTop) winDesktop.sendToBottom(mainWin); });
   // The window can only be moved/resized by the user in 위치 및 크기 mode. Moves at other times come
   // from us or Windows (e.g. a monitor was unplugged) and must not replace the user's chosen spot.
   const remember = () => {
@@ -270,6 +272,7 @@ function createMainWindow() {
   mainWin.on('closed', () => {
     mainWin = null;
     collapsed = false;
+    onTop = false;
     if (!quitting) setTimeout(() => { if (!mainWin && !quitting) createMainWindow(); }, 3000);
   });
   mainWin.webContents.on('did-fail-load', (_e, code, desc, url, isMainFrame) => {
@@ -301,6 +304,7 @@ function openSetup() {
  */
 function setLoginMode(on) {
   if (!mainWin || mainWin.isDestroyed() || loginMode === on) return;
+  if (on && onTop) setOnTop(false);
   loginMode = on;
   if (on) {
     if (moveMode) setMoveMode(false);
@@ -364,10 +368,37 @@ function setVisible(visible) {
 function setCollapsed(on) {
   if (!mainWin || collapsed === on || loginMode) return;
   if (on && moveMode) setMoveMode(false);
+  if (on && onTop) setOnTop(false); // the small icon always lives on the desktop
   const here = visibleBounds(config.bounds); // where the calendar is shown on the current screens
   collapsed = on;
   if (on) mainWin.setBounds({ x: here.x, y: here.y, width: CHIP, height: CHIP });
   else mainWin.setBounds(here);
+}
+
+/**
+ * 「맨 위로」 on: the calendar leaves the desktop layer and floats above every window (the page
+ * shows it opaque) so it can be read while working; it stays there when other programs are
+ * clicked. Off: back to the bottom, on the desktop, see-through. No taskbar button either way.
+ */
+function setOnTop(on) {
+  if (!mainWin || mainWin.isDestroyed()) return;
+  on = Boolean(on) && !loginMode;
+  if (onTop !== on) {
+    onTop = on;
+    if (on) {
+      winDesktop.detachFromDesktop(mainWin);
+      mainWin.setAlwaysOnTop(true, 'floating');
+      mainWin.setSkipTaskbar(true);
+      if (!mainWin.isVisible()) mainWin.showInactive();
+      mainWin.moveTop();
+    } else {
+      mainWin.setAlwaysOnTop(false);
+      pinToDesktop(mainWin);
+      winDesktop.sendToBottom(mainWin);
+    }
+    updateTray();
+  }
+  mainWin.webContents.send('on-top', onTop);
 }
 
 function setMoveMode(on) {
@@ -467,6 +498,7 @@ function updateTray() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: visible ? '캘린더 숨기기' : '캘린더 보이기', click: () => setVisible(!visible) },
     { label: moveMode ? '위치 및 크기 조정 끝내기' : '위치 및 크기', click: () => setMoveMode(!moveMode) },
+    { label: '맨 위로 보기 (투명 끄기)', type: 'checkbox', checked: onTop, enabled: !loginMode, click: (i) => setOnTop(i.checked) },
     { label: '화면 가운데로 가져오기', click: bringToCenter },
     { label: '새로고침', click: () => mainWin?.reload() },
     { label: `업데이트 확인 (현재 ${app.getVersion()})`, click: () => checkForUpdates(true) },
@@ -505,17 +537,22 @@ function applySettings(s) {
   }
   if (JSON.stringify(s.shortcuts || {}) === prev) return;
   globalShortcut.unregisterAll();
+  shortcutStatus = {};
   for (const [name, sc] of Object.entries(s.shortcuts || {})) {
-    if (!sc?.enabled || name === 'finishEdit') continue;
+    if (!sc?.enabled || name === 'finishEdit' || !sc.keys) continue;
     try {
-      globalShortcut.register(toAccelerator(sc.keys), () => {
+      // register() returns false when another program already owns the key combination.
+      shortcutStatus[name] = globalShortcut.register(toAccelerator(sc.keys), () => {
         if (name === 'hideCalendar') setVisible(!mainWin?.isVisible());
+        else if (name === 'toggleOnTop') setOnTop(!onTop);
         else mainWin?.webContents.send('shortcut', name);
       });
     } catch (err) {
+      shortcutStatus[name] = false;
       console.warn('shortcut failed', sc.keys, err.message);
     }
   }
+  for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('shortcut-status', shortcutStatus);
 }
 
 // ---------- ipc ----------
@@ -527,11 +564,14 @@ ipcMain.on('set-collapsed', (_e, on) => setCollapsed(Boolean(on)));
 ipcMain.on('apply-settings', (_e, s) => applySettings(s));
 ipcMain.on('open-settings', (_e, tab) => openSettings(tab));
 ipcMain.on('login-mode', (_e, on) => setLoginMode(Boolean(on)));
+ipcMain.on('set-on-top', (_e, on) => setOnTop(Boolean(on)));
+ipcMain.handle('get-on-top', () => onTop);
+ipcMain.handle('shortcut-status', () => shortcutStatus);
 ipcMain.on('activate-window', (e) => {
   const w = BrowserWindow.fromWebContents(e.sender);
   if (!w || w.isDestroyed() || w.isFocused()) return;
   w.focus(); // take keyboard input; the 'focus' handler then puts the calendar back under other windows
-  if (w === mainWin && !loginMode) winDesktop.sendToBottom(w);
+  if (w === mainWin && !loginMode && !onTop) winDesktop.sendToBottom(w);
 });
 ipcMain.on('settings-preview', (_e, patch) => mainWin?.webContents.send('settings-preview', patch));
 ipcMain.handle('save-server', async (_e, url) => {

@@ -21,6 +21,19 @@ contextBridge.exposeInMainWorld('workcalDesktop', {
     ipcRenderer.on('settings-preview', handler);
     return () => ipcRenderer.removeListener('settings-preview', handler);
   },
+  setOnTop: (on) => ipcRenderer.send('set-on-top', Boolean(on)),
+  getOnTop: () => ipcRenderer.invoke('get-on-top'),
+  onOnTop: (cb) => {
+    const handler = (_e, on) => cb(Boolean(on));
+    ipcRenderer.on('on-top', handler);
+    return () => ipcRenderer.removeListener('on-top', handler);
+  },
+  getShortcutStatus: () => ipcRenderer.invoke('shortcut-status'),
+  onShortcutStatus: (cb) => {
+    const handler = (_e, st) => cb(st);
+    ipcRenderer.on('shortcut-status', handler);
+    return () => ipcRenderer.removeListener('shortcut-status', handler);
+  },
   onShortcut: (cb) => {
     const handler = (_e, name) => cb(name);
     ipcRenderer.on('shortcut', handler);
