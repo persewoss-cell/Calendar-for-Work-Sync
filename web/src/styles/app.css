@@ -50,18 +50,18 @@ button { font: inherit; color: inherit; }
 /* Left: today's date in a soft pill (just text). Centre: the month shown, with an oval 「오늘로」
    button right of it while another month is shown. The button hangs outside the centre box so
    the month title stays exactly centred. */
-.today-chip { background: rgba(0, 0, 0, .15); border-radius: 999px; padding: .25em .85em; white-space: nowrap;
+.today-chip { background: rgba(0, 0, 0, .15); border-radius: 999px; padding: .3em .9em; line-height: 1.25; white-space: nowrap;
   font-family: var(--t-today-font); font-size: var(--t-today-size); color: var(--t-today-color); font-weight: var(--t-today-weight);
   overflow: hidden; text-overflow: ellipsis; min-width: 0; align-self: center; }
 .tb-left { min-width: 0; align-items: center; gap: 4px; }
 .tb-center { position: relative; display: flex; align-items: center; justify-content: center; gap: 4px; }
 /* Same lettering as the left 「오늘은 …」 pill, text centred both ways. */
 .today-btn { white-space: nowrap; margin-left: 2px; display: inline-flex; align-items: center; justify-content: center;
-  background: rgba(255, 255, 255, .25); border: 1px solid rgba(255, 255, 255, .45); border-radius: 999px;
-  padding: .3em .9em; cursor: pointer; line-height: 1; box-sizing: border-box;
+  background: rgba(0, 0, 0, .15); border: 0; border-radius: 999px;
+  padding: .3em .9em; cursor: pointer; line-height: 1.25; box-sizing: border-box;
   font-family: var(--t-today-font); font-size: var(--t-today-size); color: var(--t-today-color); font-weight: var(--t-today-weight); }
-.today-btn:hover { background: rgba(255, 255, 255, .4); }
-.today-btn.idle { visibility: hidden; }
+button.today-btn:hover { background: rgba(0, 0, 0, .3); }
+.today-btn.here { cursor: default; }
 .icon-btn {
   position: relative; display: inline-grid; place-items: center;
   width: 32px; height: 30px; border: 0; background: none; border-radius: 6px; cursor: pointer; color: inherit;
@@ -345,7 +345,7 @@ body.card-window #root > div { height: 100vh; border-radius: 6px; }
 .compact .today-chip { display: none; }
 .compact .tb-center { justify-content: flex-start; }
 .compact .tb-title { font-size: 14px; font-weight: 600; padding: 4px 6px; }
-.compact .today-btn.idle { display: none; }
+.compact .today-btn.here { display: none; }
 .compact .icon-btn { width: 34px; }
 .compact .cell { cursor: pointer; padding: 2px; }
 .compact .cell-head { flex-wrap: nowrap; }

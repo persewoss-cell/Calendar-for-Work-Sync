@@ -136,11 +136,14 @@ export function Toolbar({ s, today, anchor, actions, countdowns, ddayActions, ve
         <span className="tb-title">
           <MonthTitle y={ay} m={am} lang={s.language} onPick={(yy, mm) => actions.goMonth(yy, mm)} />
         </span>
-        {/* Its space is always kept, so the → button doesn't jump while paging through months. */}
-        <button type="button" className={`today-btn ${away ? '' : 'idle'}`} onClick={actions.goToday} title="이번 달로 이동"
-          tabIndex={away ? 0 : -1} aria-hidden={!away}>
-          {s.language === 'en' ? 'Today' : '오늘로'}
-        </button>
+        {/* Same pill as 「오늘은 …」: 「이번 달」 while this month is shown, 「오늘로」 (a button) otherwise. */}
+        {away ? (
+          <button type="button" className="today-btn" onClick={actions.goToday} title="이번 달로 이동">
+            {s.language === 'en' ? 'Today' : '오늘로'}
+          </button>
+        ) : (
+          <span className="today-btn here">{s.language === 'en' ? 'This month' : '이번 달'}</span>
+        )}
         <button className="icon-btn" style={{ color }} title="다음" aria-label="다음" onClick={() => actions.step(1)}><Icon name="right" size={19} /></button>
       </div>
       <div className="tb-right" style={{ color }}>
